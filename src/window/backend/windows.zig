@@ -5,16 +5,12 @@ const win32 = @import("win32").everything;
 const L = win32.L;
 const HWND = win32.HWND;
 
-const kb = @import("../keyboard.zig");
+const kb = @import("../input.zig");
+const win32_keys = @import("win32_keys.zig");
 
-pub fn convertKeyboard(vk: u32) kb.Key {
-    return switch (vk) {
-        0 => {},
-        else => {
-            return kb.Key{ .unknown = vk };
-        },
-    };
-}
+// ============================================================================
+// Windows Backend
+// ============================================================================
 pub const Backend = struct {
     allocator: std.mem.Allocator,
     width: u32,
@@ -26,7 +22,8 @@ pub const Backend = struct {
     wc: win32.WNDCLASSW,
     should_close: bool,
     last_msg: win32.MSG,
-    keys_pressed: std.AutoHashMap(u32, bool),
+    input: *kb.InputState,
+
     pub fn init(
         allocator: std.mem.Allocator,
         title: []const u8,
@@ -48,14 +45,16 @@ pub const Backend = struct {
             .hIcon = null,
             .hCursor = null,
             .hbrBackground = null,
-            .lpszMenuName = L("Some Menu Name"),
+            .lpszMenuName = L(""),
             .lpszClassName = class_name,
         };
         if (0 == win32.RegisterClassW(&wc)) {
             win32.panicWin32("RegisterClass", win32.GetLastError());
         }
 
-        // Initialize self BEFORE creating the window
+        const input_state = kb.InputState.init(allocator) catch unreachable;
+        errdefer input_state.deinit();
+
         self.* = .{
             .allocator = allocator,
             .width = width,
@@ -63,11 +62,11 @@ pub const Backend = struct {
             .class_name = class_name,
             .title = title,
             .title_w = title_w,
-            .hwnd = undefined, // Will be set after CreateWindowExW
+            .hwnd = undefined,
             .should_close = false,
             .last_msg = undefined,
             .wc = wc,
-            .keys_pressed = std.AutoHashMap(u32, bool).init(allocator),
+            .input = input_state,
         };
 
         const hwnd = win32.CreateWindowExW(
@@ -82,21 +81,22 @@ pub const Backend = struct {
             null,
             null,
             null,
-            @ptrCast(self), // Pass self as lpParam - available in WM_CREATE
+            @ptrCast(self),
         ) orelse win32.panicWin32("CreateWindow", win32.GetLastError());
 
         self.hwnd = hwnd;
-
-        // This ensures it's set for all future messages
         _ = win32.SetWindowLongPtrW(hwnd, win32.GWLP_USERDATA, @intCast(@intFromPtr(self)));
-
         _ = win32.ShowWindow(hwnd, .{ .SHOWNORMAL = 1 });
-
+        _ = win32.UpdateWindow(hwnd);
         return self;
     }
 
     pub fn getNativeHandle(self: *Backend) *anyopaque {
         return @ptrCast(self.hwnd);
+    }
+
+    pub fn getWin32ModuleHandle(_: *Backend) ?*anyopaque {
+        return win32.GetModuleHandleW(null);
     }
 
     pub fn deinit(self: *Backend) void {
@@ -105,29 +105,39 @@ pub const Backend = struct {
 
         self.allocator.free(self.class_name);
         self.allocator.free(self.title_w);
-        self.keys_pressed.deinit();
+        self.input.deinit();
 
         self.allocator.destroy(self);
     }
 
     pub fn update(self: *Backend) void {
-        const result = win32.GetMessageW(&self.last_msg, null, 0, 0);
-        if (result == 0) {
-            // WM_QUIT was received
-            self.should_close = true;
-            return;
+        // Begin new input frame
+        self.input.beginFrame();
+
+        // Process all pending messages
+        var msg: win32.MSG = undefined;
+        while (win32.PeekMessageW(&msg, null, 0, 0, win32.PM_REMOVE) != 0) {
+            if (msg.message == win32.WM_QUIT) {
+                self.should_close = true;
+                return;
+            }
+            _ = win32.TranslateMessage(&msg);
+            _ = win32.DispatchMessageW(&msg);
         }
-        if (result > 0) {
-            _ = win32.TranslateMessage(&self.last_msg);
-            _ = win32.DispatchMessageW(&self.last_msg);
-        }
-        // If result < 0, there was an error (you might want to handle this)
     }
 
     pub fn shouldClose(self: *Backend) bool {
         return self.should_close;
     }
+
+    pub fn getInput(self: *Backend) *kb.InputState {
+        return self.input;
+    }
 };
+
+// ============================================================================
+// Window Procedure
+// ============================================================================
 
 fn WindowProc(
     hwnd: HWND,
@@ -135,7 +145,6 @@ fn WindowProc(
     wParam: win32.WPARAM,
     lParam: win32.LPARAM,
 ) callconv(.winapi) win32.LRESULT {
-    // Handle WM_CREATE specially to set up the user data
     if (uMsg == win32.WM_CREATE) {
         const create_struct: *win32.CREATESTRUCTW = @ptrFromInt(@as(usize, @intCast(lParam)));
         const self: *Backend = @ptrCast(@alignCast(create_struct.lpCreateParams));
@@ -143,9 +152,9 @@ fn WindowProc(
         return win32.DefWindowProcW(hwnd, uMsg, wParam, lParam);
     }
 
-    // Get the Backend pointer
     const raw = win32.GetWindowLongPtrW(hwnd, win32.GWLP_USERDATA);
     const self: ?*Backend = if (raw != 0) @ptrFromInt(@as(usize, @intCast(raw))) else null;
+
     switch (uMsg) {
         win32.WM_DESTROY => {
             if (self) |s| {
@@ -154,28 +163,160 @@ fn WindowProc(
             win32.PostQuitMessage(0);
             return 0;
         },
-        win32.WM_KEYDOWN => {
+
+        // win32.WM_PAINT => {
+        //     var ps: win32.PAINTSTRUCT = undefined;
+        //     const hdc = win32.BeginPaint(hwnd, &ps);
+        //     _ = win32.FillRect(hdc, &ps.rcPaint, @ptrFromInt(@intFromEnum(win32.COLOR_WINDOW) + 1));
+        //     _ = win32.EndPaint(hwnd, &ps);
+        //     return 0;
+        // },
+
+        // ====================================================================
+        // Keyboard Events
+        // ====================================================================
+
+        win32.WM_KEYDOWN, win32.WM_SYSKEYDOWN => {
             if (self) |s| {
-                s.keys_pressed.put(@intCast(wParam), true) catch {};
-                std.debug.print("Key pressed: {}\n", .{wParam});
+                const vk: u16 = @truncate(wParam);
+                const flags: u32 = @bitCast(@as(u32, @truncate(@as(usize, @bitCast(lParam)))));
+                const repeat = (flags & 0x40000000) != 0;
+
+                const extended_vk = win32_keys.getExtendedKeyCode(vk, flags);
+                const key = win32_keys.win32VKToKey(extended_vk);
+
+                if (key != .Unknown) {
+                    const state: kb.KeyState = if (repeat) .Repeat else .Pressed;
+                    s.input.handleKeyEvent(key, state) catch {};
+                }
+            }
+
+            // Let Alt+F4 and other system keys through
+            if (uMsg == win32.WM_SYSKEYDOWN) {
+                return win32.DefWindowProcW(hwnd, uMsg, wParam, lParam);
             }
             return 0;
         },
-        win32.WM_KEYUP => {
+
+        win32.WM_KEYUP, win32.WM_SYSKEYUP => {
             if (self) |s| {
-                s.keys_pressed.put(@intCast(wParam), false) catch {};
+                const vk: u16 = @truncate(wParam);
+                const flags: u32 = @bitCast(@as(u32, @truncate(@as(usize, @bitCast(lParam)))));
+
+                const extended_vk = win32_keys.getExtendedKeyCode(vk, flags);
+                const key = win32_keys.win32VKToKey(extended_vk);
+
+                if (key != .Unknown) {
+                    s.input.handleKeyEvent(key, .Released) catch {};
+                }
+            }
+
+            if (uMsg == win32.WM_SYSKEYUP) {
+                return win32.DefWindowProcW(hwnd, uMsg, wParam, lParam);
             }
             return 0;
         },
-        win32.WM_PAINT => {
-            var ps: win32.PAINTSTRUCT = undefined;
-            const hdc = win32.BeginPaint(hwnd, &ps);
-            _ = win32.FillRect(hdc, &ps.rcPaint, @ptrFromInt(@intFromEnum(win32.COLOR_WINDOW) + 1));
-            _ = win32.TextOutA(hdc, 20, 20, "Hello", 5);
-            _ = win32.EndPaint(hwnd, &ps);
+
+        // ====================================================================
+        // Mouse Button Events
+        // ====================================================================
+
+        win32.WM_LBUTTONDOWN => {
+            if (self) |s| {
+                s.input.handleMouseButtonEvent(.Left, .Pressed) catch {};
+            }
             return 0;
         },
+
+        win32.WM_LBUTTONUP => {
+            if (self) |s| {
+                s.input.handleMouseButtonEvent(.Left, .Released) catch {};
+            }
+            return 0;
+        },
+
+        win32.WM_RBUTTONDOWN => {
+            if (self) |s| {
+                s.input.handleMouseButtonEvent(.Right, .Pressed) catch {};
+            }
+            return 0;
+        },
+
+        win32.WM_RBUTTONUP => {
+            if (self) |s| {
+                s.input.handleMouseButtonEvent(.Right, .Released) catch {};
+            }
+            return 0;
+        },
+
+        win32.WM_MBUTTONDOWN => {
+            if (self) |s| {
+                s.input.handleMouseButtonEvent(.Middle, .Pressed) catch {};
+            }
+            return 0;
+        },
+
+        win32.WM_MBUTTONUP => {
+            if (self) |s| {
+                s.input.handleMouseButtonEvent(.Middle, .Released) catch {};
+            }
+            return 0;
+        },
+
+        win32.WM_XBUTTONDOWN => {
+            if (self) |s| {
+                const button_id = (wParam >> 16) & 0xFFFF;
+                const button: kb.MouseButton = if (button_id == 1) .X1 else .X2;
+                s.input.handleMouseButtonEvent(button, .Pressed) catch {};
+            }
+            return 1; // Indicate we handled the message
+        },
+
+        win32.WM_XBUTTONUP => {
+            if (self) |s| {
+                const button_id = (wParam >> 16) & 0xFFFF;
+                const button: kb.MouseButton = if (button_id == 1) .X1 else .X2;
+                s.input.handleMouseButtonEvent(button, .Released) catch {};
+            }
+            return 1;
+        },
+
+        // ====================================================================
+        // Mouse Movement
+        // ====================================================================
+
+        win32.WM_MOUSEMOVE => {
+            if (self) |s| {
+                const x: i32 = @as(i16, @truncate(lParam & 0xFFFF));
+                const y: i32 = @as(i16, @truncate((lParam >> 16) & 0xFFFF));
+                s.input.handleMouseMove(x, y) catch {};
+            }
+            return 0;
+        },
+
+        // ====================================================================
+        // Mouse Wheel
+        // ====================================================================
+
+        win32.WM_MOUSEWHEEL => {
+            if (self) |s| {
+                const delta: i16 = @bitCast(@as(u16, @truncate(wParam >> 16)));
+                const wheel_delta: f32 = @as(f32, @floatFromInt(delta)) / 120.0;
+                s.input.handleMouseScroll(0, wheel_delta) catch {};
+            }
+            return 0;
+        },
+        win32.WM_MOUSEHWHEEL => {
+            if (self) |s| {
+                const delta: i16 = @bitCast(@as(u16, @truncate(wParam >> 16)));
+                const wheel_delta: f32 = @as(f32, @floatFromInt(delta)) / 120.0;
+                s.input.handleMouseScroll(wheel_delta, 0) catch {};
+            }
+            return 0;
+        },
+
         else => {},
     }
+
     return win32.DefWindowProcW(hwnd, uMsg, wParam, lParam);
 }

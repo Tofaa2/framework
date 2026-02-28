@@ -3,29 +3,28 @@ const builtin = @import("builtin");
 
 pub const windows = @import("backend/windows.zig");
 
-pub const keyboard = @import("keyboard.zig");
-pub const Key = keyboard.Key;
-pub const KeyModifier = keyboard.KeyModifier;
+pub const input = @import("input.zig");
 
-pub fn Window() type {
-    const os = builtin.os.tag;
-    if (os == .windows) {
-        return GenericWindow(windows.Backend);
-    } else {
-        @panic("Your platform is not supported by the framework window library");
-    }
-}
+pub const Window = switch (builtin.os.tag) {
+    .windows => GenericWindow(windows.Backend),
+    else => @compileError("Your platform is not supported"),
+};
 
-pub fn GenericWindow(
-    comptime Backend: type,
-) type {
+/// Generic window type that works with any backend
+pub fn GenericWindow(comptime Backend: type) type {
     return struct {
-        backend: *Backend,
         const Self = @This();
 
+        allocator: std.mem.Allocator,
+        backend: *Backend,
+
         pub fn init(allocator: std.mem.Allocator, title: []const u8, width: u32, height: u32) !Self {
+            const backend = Backend.init(allocator, title, width, height);
+            errdefer backend.deinit();
+
             return Self{
-                .backend = Backend.init(allocator, title, width, height),
+                .allocator = allocator,
+                .backend = backend,
             };
         }
 
@@ -37,12 +36,20 @@ pub fn GenericWindow(
             self.backend.update();
         }
 
+        pub fn getInput(self: *Self) *input.InputState {
+            return self.backend.getInput();
+        }
+
         pub fn shouldClose(self: *Self) bool {
             return self.backend.shouldClose();
         }
-        
+
         pub fn getNativeHandle(self: *Self) *anyopaque {
             return self.backend.getNativeHandle();
+        }
+
+        pub fn getWin32ModuleHandle(self: *Self) ?*anyopaque {
+            return self.backend.getWin32ModuleHandle();
         }
     };
 }

@@ -1,6 +1,12 @@
 const std = @import("std");
 const builtin = @import("builtin");
 
+pub const queue = @import("queue.zig");
+
+fn TPtr(T: type, opaque_ptr: *anyopaque) T {
+    return @as(T, @ptrCast(@alignCast(opaque_ptr)));
+}
+
 /// The runtime-available representation of a Zig type.
 pub const TypeInfo = struct {
     name: []const u8,

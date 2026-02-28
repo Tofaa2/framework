@@ -11,6 +11,22 @@
             .url = "git+https://github.com/marlersoft/zigwin32#3be22a8d33d330662b1fbb5b68c9411bf0293e27",
             .hash = "zigwin32-25.0.28-preview-AAAAAB6N5AP3iLHsHKzg7r_aiDyYWo92qLOAG2eBLWhE",
         },
+        .zbgfx = .{
+            .url = "git+https://github.com/cyberegoorg/zbgfx/#91b0dd7159ab35ec877fa06dc22b20ad0b118ee2",
+            .hash = "zbgfx-0.7.0-Sm4IxHlk1gL_wSKLBaKzsexkiyZTJ85huunX2hbWhM79",
+        },
+        .zig_bgfx = .{
+            .url = "git+https://github.com/jean-dao/zig-bgfx#44736e350c42927fa644ccf7382d9a5cd867bce7",
+            .hash = "zig_bgfx-0.0.0-5XhMYAO9AAAz-1tzHkZkfVB7TByQ1poppETYVfiX_IHo",
+        },
+        .zmath = .{
+            .url = "git+https://github.com/zig-gamedev/zmath#3a5955b2b72cd081563fbb084eff05bffd1e3fbb",
+            .hash = "zmath-0.11.0-dev-wjwivdMsAwD-xaLj76YHUq3t9JDH-X16xuMTmnDzqbu2",
+        },
+        .zglm = .{
+            .url = "git+https://github.com/Tofaa2/zglm#e5ac936d195bf0cb89b03ce80b8c14c367ae359c",
+            .hash = "zglm-0.0.0-zWeN7XhQEQDwIMkMkCGReOpvreNAptbe_Co_m43b6m0c",
+        },
     },
     .paths = .{
         "build.zig",
