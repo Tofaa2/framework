@@ -2,6 +2,11 @@ const std = @import("std");
 const framework = @import("framework");
 const window = @import("window");
 const renderer = @import("renderer");
+const utils = @import("utils");
+
+pub const std_options = std.Options {
+    .logFn = utils.logFn,
+};
 
 pub fn main() !void {
     var w = try window.Window.init(std.heap.page_allocator, "Hello, Mogus", 800, 600);

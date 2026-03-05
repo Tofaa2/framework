@@ -6,7 +6,6 @@ pub fn build(b: *std.Build) !void {
     const optimize = b.standardOptimizeOption(.{});
 
     const test_step = b.step("test", "Run all tests");
-
     const utils = makeModule(b, test_step, "framework-utils", "src/utils/root.zig", &.{}, target, optimize);
     const scheduler = makeModule(b, test_step, "framework-scheduler", "src/scheduler/root.zig", &.{}, target, optimize);
     const resources = makeModule(b, test_step, "framework-resources", "src/resources/root.zig", &.{
@@ -68,8 +67,12 @@ pub fn build(b: *std.Build) !void {
                     .name = "renderer",
                     .module = renderer,
                 },
+                .{
+                    .name = "utils",
+                    .module = utils,
+                },
             },
-
+            
             .optimize = optimize,
             .target = target,
             .link_libc = true,

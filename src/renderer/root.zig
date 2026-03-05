@@ -220,7 +220,7 @@ pub const Renderer = struct {
     }) !Renderer {
         var b_init = std.mem.zeroes(bgfx.Init);
         bgfx.initCtor(&b_init);
-        b_init.type = .Count;
+        b_init.type = .Vulkan;
         b_init.platformData.nwh = config.native_handle;
         b_init.resolution.width = config.width;
         b_init.resolution.height = config.height;
@@ -406,7 +406,7 @@ pub const Renderer = struct {
     }
 
     pub fn drawRectTexturedUV(self: *Renderer, x: f32, y: f32, w: f32, h: f32, color: u32, texture: bgfx.TextureHandle, uu0: f32, v0: f32, uu1: f32, v1: f32) void {
-        self.quad2d(texture, mkv(x, y, 0, color, uu0, v0), mkv(x + w, y, 0, color, uu1, v0), mkv(x + w, y + h, 0, color, uu1, v1), mkv(x, y + h, 0, color, u0, v1));
+        self.quad2d(texture, mkv(x, y, 0, color, uu0, v0), mkv(x + w, y, 0, color, uu1, v0), mkv(x + w, y + h, 0, color, uu1, v1), mkv(x, y + h, 0, color, uu0, v1));
     }
 
     pub fn setCamera(self: *Renderer, view: math.Mat4x4) void {
@@ -615,10 +615,16 @@ pub const Renderer = struct {
             bgfx.setTransientVertexBuffer(0, &tvb, batch.vertex_start, batch.vertex_count);
             bgfx.setTransientIndexBuffer(&tib, batch.index_start, batch.index_count);
             bgfx.setTexture(0, self.sampler, batch.texture, std.math.maxInt(u32));
+            //const blend_alpha = bgfx.StateFlags_BlendSrcAlpha | (bgfx.StateFlags_BlendInvSrcAlpha << 4);
             const state = if (batch.view == VIEW_SCENE)
                 bgfx.StateFlags_WriteRgb | bgfx.StateFlags_WriteA | bgfx.StateFlags_WriteZ | bgfx.StateFlags_DepthTestLess
             else
-                bgfx.StateFlags_WriteRgb | bgfx.StateFlags_WriteA | bgfx.StateFlags_BlendSrcAlpha;
+                bgfx.StateFlags_WriteRgb | bgfx.StateFlags_WriteA | (bgfx.StateFlags_BlendSrcAlpha | (bgfx.StateFlags_BlendInvSrcAlpha << 4));
+            //const state = if (batch.view == VIEW_SCENE)
+            //  bgfx.StateFlags_WriteRgb | bgfx.StateFlags_WriteA | bgfx.StateFlags_WriteZ | bgfx.StateFlags_DepthTestLess
+            //else
+
+            //bgfx.StateFlags_WriteRgb | bgfx.StateFlags_WriteA | bgfx.StateFlags_BlendSrcAlpha;
             bgfx.setState(state, 0);
 
             bgfx.submit(batch.view, self.shader.program_handle, 0, @as(u8, 0xFF));
@@ -682,8 +688,22 @@ pub const Renderer = struct {
                             .vec4 => |v| bgfx.setUniform(handle, &v, 1),
                             .mat4 => |v| bgfx.setUniform(handle, &v, 1),
                         }
+                        bgfx.destroyUniform(handle); // <-- add this
                     }
                     self.submitFullscreenQuad(view_id, cfg.shader, src_tex, null, null);
+
+                    //for (cfg.uniforms) |u| {
+                    //    const handle = bgfx.createUniform(
+                    //        @as([*:0]const u8, @ptrCast(u.name.ptr)),
+                    //        .Vec4,
+                    //        1,
+                    //    );
+                    //    switch (u.value) {
+                    //        .vec4 => |v| bgfx.setUniform(handle, &v, 1),
+                    //        .mat4 => |v| bgfx.setUniform(handle, &v, 1),
+                    //    }
+                    // }
+                    //self.submitFullscreenQuad(view_id, cfg.shader, src_tex, null, null);
                 },
             }
 
