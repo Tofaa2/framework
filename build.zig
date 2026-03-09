@@ -1,54 +1,30 @@
 const std = @import("std");
+const Build = *std.Build;
+const Optimize = std.builtin.OptimizeMode;
+const Target = std.Build.ResolvedTarget;
+const Module = *std.Build.Module;
+
 const zig_bgfx = @import("zig_bgfx");
 
 pub fn build(b: *std.Build) !void {
     const target = b.standardTargetOptions(.{});
     const optimize = b.standardOptimizeOption(.{});
 
-    const test_step = b.step("test", "Run all tests");
-    const utils = makeModule(b, test_step, "framework-utils", "src/utils/root.zig", &.{}, target, optimize);
-    const scheduler = makeModule(b, test_step, "framework-scheduler", "src/scheduler/root.zig", &.{}, target, optimize);
-    const resources = makeModule(b, test_step, "framework-resources", "src/resources/root.zig", &.{
-        .{
-            .name = "utils",
-            .module = utils,
-        },
-    }, target, optimize);
+    const runtime_mod = b.addModule("runtime", .{
+        .root_source_file = b.path("runtime/root.zig"),
+        .optimize = optimize,
+        .target = target,
+    });
+    runtime_mod.addIncludePath(b.path("include/"));
+    runtime_mod.addCSourceFile(.{ .file = b.path("runtime/c/stb_impl.c") });
 
-    const plugin = makeModule(b, test_step, "framework-plugin", "src/plugin/root.zig", &.{.{
-        .name = "utils",
-        .module = utils,
-    }}, target, optimize);
-
-    const app_sdk = makeModule(b, test_step, "framework-app-sdk", "src/app-sdk/root.zig", &.{}, target, optimize);
-    linkSimpleModDep(b, app_sdk, "entt", "ecs", "zig-ecs");
-    app_sdk.addImport("utils", utils);
-    app_sdk.addImport("plugin", plugin);
-    app_sdk.addImport("scheduler", scheduler);
-    app_sdk.addImport("resources", resources);
-
-    const window = makeModule(b, test_step, "framework-window", "src/window/root.zig", &.{}, target, optimize);
-    linkSimpleModDep(b, window, "zigwin32", "win32", "win32");
-
-    const math = makeModule(b, test_step, "framework-math", "src/math/root.zig", &.{}, target, optimize);
-
-    const renderer = makeModule(b, test_step, "framework-renderer", "src/renderer/root.zig", &.{
-        .{
-            .name = "utils",
-            .module = utils,
-        },
-        .{
-            .name = "math",
-            .module = math,
-        },
-    }, target, optimize);
-    linkSimpleModDep(b, renderer, "zigwin32", "win32", "win32");
+    linkSimpleModDep(b, runtime_mod, "entt", "ecs", "zig-ecs");
+    linkSimpleModDep(b, runtime_mod, "zigwin32", "win32", "win32");
     linkBgfx(b, .{
-        .path = "src/renderer/shader/",
+        .path = "runtime/renderer/shader/",
         .install_subdir = "renderer-shaders",
         .import_name = "renderer-shaders",
-    }, renderer, target, optimize);
-    renderer.addIncludePath(b.path("thirdparty/stb/"));
+    }, runtime_mod, target, optimize);
 
     const exe = b.addExecutable(.{
         .name = "framework-sandbox",
@@ -56,23 +32,11 @@ pub fn build(b: *std.Build) !void {
             .root_source_file = b.path("sandbox/main.zig"),
             .imports = &.{
                 .{
-                    .name = "framework",
-                    .module = app_sdk,
-                },
-                .{
-                    .name = "window",
-                    .module = window,
-                },
-                .{
-                    .name = "renderer",
-                    .module = renderer,
-                },
-                .{
-                    .name = "utils",
-                    .module = utils,
+                    .name = "framework-runtime",
+                    .module = runtime_mod,
                 },
             },
-            
+
             .optimize = optimize,
             .target = target,
             .link_libc = true,
@@ -92,75 +56,20 @@ pub fn build(b: *std.Build) !void {
     run_step.dependOn(&run_cmd.step);
 }
 
-fn linkSimpleModDep(b: *std.Build, module: *std.Build.Module, dep_name: []const u8, name: []const u8, mod_name: []const u8) void {
-    const dep = b.dependency(dep_name, .{});
-    const mod = dep.module(mod_name);
-    module.addImport(name, mod);
-}
-fn linkSimpleModDepWithArtifact(b: *std.Build, module: *std.Build.Module, dep_name: []const u8, name: []const u8, mod_name: []const u8, artifact: []const u8) void {
-    const dep = b.dependency(dep_name, .{});
-    const mod = dep.module(mod_name);
-    module.addImport(name, mod);
-    module.linkLibrary(dep.artifact(artifact));
-}
-
-fn makeModule(
-    b: *std.Build,
-    tests: *std.Build.Step,
-    name: []const u8,
-    path: []const u8,
-    imports: []const std.Build.Module.Import,
-    target: std.Build.ResolvedTarget,
-    optimize: std.builtin.OptimizeMode,
-) *std.Build.Module {
-    const mod = b.addModule(name, .{
-        .target = target,
-        .optimize = optimize,
-        .root_source_file = b.path(path),
-        .imports = imports,
-    });
-
-    const module_tests = b.addTest(.{
-        .root_module = mod,
-        //.root_source_file = b.path(mod_info.path),
-    });
-    // module_tests.linkLibC();
-    // module_tests.addIncludePath(b.path("includes/"));
-
-    const run_module_tests = b.addRunArtifact(module_tests);
-    tests.dependOn(&run_module_tests.step);
-    return mod;
-}
-
-fn makeAppSdkPlugin(
-    b: *std.Build,
-    tests: *std.Build.Step,
-    name: []const u8,
-    path: []const u8,
-    imports: []const std.Build.Module.Import,
-    target: std.Build.ResolvedTarget,
-    optimize: std.builtin.OptimizeMode,
-    app_sdk: *std.Build.Module,
-) *std.Build.Module {
-    const mod = makeModule(b, tests, name, path, imports, target, optimize);
-    mod.addImport("app-sdk", app_sdk);
-    return mod;
-}
-
 inline fn thisDir() []const u8 {
     return comptime std.fs.path.dirname(@src().file) orelse ".";
 }
 
 fn linkBgfx(
-    b: *std.Build,
+    b: Build,
     shader: ?struct {
         path: []const u8,
         import_name: []const u8,
         install_subdir: []const u8,
     },
-    module: *std.Build.Module,
-    target: std.Build.ResolvedTarget,
-    optimize: std.builtin.OptimizeMode,
+    module: Module,
+    target: Target,
+    optimize: Optimize,
 ) void {
     _ = optimize;
     // link BGFX
@@ -210,4 +119,16 @@ fn linkBgfx(
         b.getInstallStep().dependOn(&shader_dir_install.step);
         // exe.step.dependOn(&shader_dir_install.step);
     }
+}
+
+fn linkSimpleModDep(b: *std.Build, module: *std.Build.Module, dep_name: []const u8, name: []const u8, mod_name: []const u8) void {
+    const dep = b.dependency(dep_name, .{});
+    const mod = dep.module(mod_name);
+    module.addImport(name, mod);
+}
+fn linkSimpleModDepWithArtifact(b: *std.Build, module: *std.Build.Module, dep_name: []const u8, name: []const u8, mod_name: []const u8, artifact: []const u8) void {
+    const dep = b.dependency(dep_name, .{});
+    const mod = dep.module(mod_name);
+    module.addImport(name, mod);
+    module.linkLibrary(dep.artifact(artifact));
 }
