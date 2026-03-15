@@ -5,5 +5,9 @@ pub fn apply(b: *std.Build, target: std.Build.ResolvedTarget, optimize: std.buil
         .root_source_file = b.path("plugins/window/src/root.zig"),
         .target = target,
         .optimize = optimize,
+        .imports = &.{
+            .{ .name = "window", .module = b.modules.get("window").? },
+            .{ .name = "runtime", .module = b.modules.get("runtime").? },
+        },
     });
 }

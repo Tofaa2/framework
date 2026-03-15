@@ -9,6 +9,6 @@ pub fn update(self: *Self, current_time: i128) void {
         self.last_frame = current_time;
         return;
     }
-    self.delta = @as(f64, @intFromFloat(current_time - self.last_frame)) / 1_000_000_000.0;
+    self.delta = @as(f64, @floatFromInt(current_time - self.last_frame)) / 1_000_000_000.0;
     self.last_frame = current_time;
 }

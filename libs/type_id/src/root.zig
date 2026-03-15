@@ -19,7 +19,7 @@ pub const TypeInfo = struct {
     }
 };
 
-const TypeId = enum(usize) {
+pub const TypeId = enum(usize) {
     _,
 
     pub fn name(self: TypeId) []const u8 {
@@ -31,7 +31,7 @@ const TypeId = enum(usize) {
     }
 };
 
-fn typeId(comptime T: type) TypeId {
+pub fn typeId(comptime T: type) TypeId {
     const Tag = struct {
         var name: u8 = @typeName(T)[0]; // must depend on the type somehow!
         inline fn id() TypeId {
@@ -41,6 +41,6 @@ fn typeId(comptime T: type) TypeId {
     return Tag.id();
 }
 
-fn typeIdInt(comptime T: type) usize {
+pub fn typeIdInt(comptime T: type) usize {
     return @intFromEnum(typeId(T));
 }

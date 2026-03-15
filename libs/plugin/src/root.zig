@@ -3,13 +3,13 @@ const TypeInfo = @import("type_id").TypeInfo;
 
 pub const TypeErased = struct {
     ptr: *anyopaque,
+    config_ptr: *anyopaque, // Store type-erased configuration
     type_id: TypeInfo,
-    // Store dependencies as IDs to resolve at runtime
     dependencies: []const usize,
 
-    init: *const fn (*anyopaque, *anyopaque) void,
+    init: *const fn (*anyopaque, *anyopaque, *anyopaque) void,
     deinit: *const fn (*anyopaque, *anyopaque) void,
-    destroy: *const fn (*anyopaque, std.mem.Allocator) void,
+    destroy: *const fn (*anyopaque, *anyopaque, std.mem.Allocator) void,
 };
 
 pub const PluginError = error{
@@ -28,7 +28,7 @@ pub fn PluginManager(comptime Context: type) type {
         pub fn init(allocator: std.mem.Allocator) Self {
             return .{
                 .allocator = allocator,
-                .plugins = .empty, // Keeping your preferred 0.15.x style
+                .plugins = .empty,
             };
         }
 
@@ -40,19 +40,18 @@ pub fn PluginManager(comptime Context: type) type {
                 const plugin = self.plugins.items[i];
                 plugin.deinit(plugin.ptr, @as(*anyopaque, @ptrCast(context)));
 
-                // Free the runtime dependency list and the plugin instance
+                // Free the runtime dependency list, config, and the plugin instance
                 self.allocator.free(plugin.dependencies);
-                plugin.destroy(plugin.ptr, self.allocator);
+                plugin.destroy(plugin.ptr, plugin.config_ptr, self.allocator);
             }
             self.plugins.deinit(self.allocator);
         }
 
-        /// Sorts and then initializes
         pub fn initPlugins(self: *Self, context: *Context) !void {
             try self.sortDependencies();
 
             for (self.plugins.items) |plugin| {
-                plugin.init(plugin.ptr, context);
+                plugin.init(plugin.ptr, plugin.config_ptr, context);
             }
         }
 
@@ -66,7 +65,6 @@ pub fn PluginManager(comptime Context: type) type {
             var sorted_list = try std.ArrayList(TypeErased).initCapacity(self.allocator, self.plugins.items.len);
             errdefer sorted_list.deinit(self.allocator);
 
-            // Mapping for quick lookup during DFS
             var type_map = std.AutoHashMap(usize, usize).init(self.allocator);
             defer type_map.deinit();
             for (self.plugins.items, 0..) |p, i| try type_map.put(p.type_id.id, i);
@@ -101,15 +99,14 @@ pub fn PluginManager(comptime Context: type) type {
                 }
             }
 
-            // Swap old unsorted list with the new sorted one
             self.plugins.deinit(self.allocator);
             self.plugins = sorted_list;
         }
 
-        pub fn add(self: *Self, plugin: anytype) PluginError!void {
+        pub fn add(self: *Self, plugin: anytype, config: anytype) PluginError!void {
             const plugin_type = @TypeOf(plugin);
+            const config_type = @TypeOf(config);
 
-            // Capture dependency IDs into a heap-allocated slice
             var deps: std.ArrayList(usize) = .empty;
             errdefer deps.deinit(self.allocator);
 
@@ -119,30 +116,61 @@ pub fn PluginManager(comptime Context: type) type {
                 }
             }
 
-            const heaped = self.allocator.create(plugin_type) catch return error.AllocationFailed;
-            heaped.* = plugin;
+            // 1. Allocate Plugin
+            const heaped_plugin = self.allocator.create(plugin_type) catch return error.AllocationFailed;
+            errdefer self.allocator.destroy(heaped_plugin);
+            heaped_plugin.* = plugin;
+
+            var heaped_config: *anyopaque = undefined;
+            if (@sizeOf(config_type) > 0) {
+                const hc = self.allocator.create(config_type) catch return error.AllocationFailed;
+                hc.* = config;
+                heaped_config = hc;
+            }
+            errdefer if (@sizeOf(config_type) > 0) self.allocator.destroy(@as(*config_type, @ptrCast(@alignCast(heaped_config))));
+
+            const final_deps = deps.toOwnedSlice(self.allocator) catch |err| {
+                std.log.err("Failed to allocate erased dependencies: {s}", .{@errorName(err)});
+                return PluginError.AllocationFailed;
+            };
+            errdefer self.allocator.free(final_deps);
 
             const func_wrapper = struct {
-                pub fn init(inst: *anyopaque, context: *anyopaque) void {
+                pub fn init(inst: *anyopaque, conf_inst: *anyopaque, context: *anyopaque) void {
                     const plugin_ptr: *plugin_type = @ptrCast(@alignCast(inst));
-                    if (@hasDecl(plugin_type, "init")) plugin_ptr.init(@ptrCast(@alignCast(context)));
+                    const config_ptr: *config_type = @ptrCast(@alignCast(conf_inst));
+
+                    if (@hasDecl(plugin_type, "init")) {
+                        const params = @typeInfo(@TypeOf(plugin_type.init)).@"fn".params;
+
+                        if (params.len == 3) {
+                            plugin_ptr.init(@ptrCast(@alignCast(context)), config_ptr.*);
+                        } else if (params.len == 2) {
+                            plugin_ptr.init(@ptrCast(@alignCast(context)));
+                        } else {
+                            @compileError("init function must have 2 or 3 parameters: (self, context) or (self, context, config)");
+                        }
+                    }
                 }
+
                 pub fn deinit(inst: *anyopaque, context: *anyopaque) void {
                     const plugin_ptr: *plugin_type = @ptrCast(@alignCast(inst));
                     if (@hasDecl(plugin_type, "deinit")) plugin_ptr.deinit(@ptrCast(@alignCast(context)));
                 }
-                pub fn destroy(inst: *anyopaque, allocator: std.mem.Allocator) void {
+
+                pub fn destroy(inst: *anyopaque, conf_inst: *anyopaque, allocator: std.mem.Allocator) void {
                     allocator.destroy(@as(*plugin_type, @ptrCast(@alignCast(inst))));
+                    if (@sizeOf(config_type) > 0) {
+                        allocator.destroy(@as(*config_type, @ptrCast(@alignCast(conf_inst))));
+                    }
                 }
             };
+
             const erased = TypeErased{
-                .ptr = heaped,
+                .ptr = heaped_plugin,
+                .config_ptr = heaped_config,
                 .type_id = TypeInfo.get(plugin_type),
-                .dependencies = deps.toOwnedSlice(self.allocator) catch |err| {
-                    self.allocator.destroy(heaped);
-                    std.log.err("Failed to allocate erased dependencies: {s}", .{@errorName(err)});
-                    return PluginError.AllocationFailed;
-                },
+                .dependencies = final_deps,
                 .init = func_wrapper.init,
                 .deinit = func_wrapper.deinit,
                 .destroy = func_wrapper.destroy,
@@ -153,6 +181,8 @@ pub fn PluginManager(comptime Context: type) type {
     };
 }
 
+// --- Tests ---
+
 test "hello" {
     const allocator = std.testing.allocator;
     var c = C{};
@@ -160,30 +190,33 @@ test "hello" {
     var pm = PluginManager(C).init(allocator);
     errdefer pm.deinit(&c);
 
-    try pm.add(B{});
-    try pm.add(A{});
-    try pm.add(D{});
+    // Pass the config. Since A and D don't have a config, we can just pass an empty struct `{}`
+    try pm.add(B{}, .{ .var1 = 10, .var2 = "str" });
+    try pm.add(A{}, .{});
+    try pm.add(D{}, .{});
 
     try pm.initPlugins(&c);
     pm.deinit(&c);
 }
+
 const C = struct {};
+
 const A = struct {
     pub fn init(_: *A, _: *C) void {
         std.debug.print("A\n", .{});
     }
 };
+
 const B = struct {
     pub const dependencies = .{D};
 
-    pub fn init(_: *B, _: *C) void {
-        std.debug.print("B\n", .{});
+    // Notice we can now type the third parameter specifically
+    pub fn init(_: *B, _: *C, config: struct { var1: i32, var2: []const u8 }) void {
+        std.debug.print("B config received: var1={}, var2={s}\n", .{ config.var1, config.var2 });
     }
 };
 
 pub const D = struct {
-    // pub const dependencies = .{B};
-
     pub fn init(_: *D, _: *C) void {
         std.debug.print("D\n", .{});
     }

@@ -1,29 +1,43 @@
 const std = @import("std");
 
+pub const prelude = @import("prelude.zig");
+
 // Exported namespaces
+pub const App = @import("App.zig");
+pub const PluginManager = prelude.plugin.PluginManager(App);
+pub const Time = @import("Time.zig");
 
 pub const window = @import("window");
 pub const Window = window.Window;
-
-pub const ResourcePool = @import("ResourcePool.zig");
-pub const Scheduler = @import("scheduler.zig").Scheduler;
-pub const App = @import("App.zig");
-
-pub const plugin = @import("plugin.zig");
-pub const PluginManager = plugin.PluginManager;
 
 pub const stb = @import("stb");
 pub const math = @import("math");
 pub const bgfx = @import("bgfx");
 pub const renderer = @import("renderer/root.zig");
-pub const type_id = @import("type_id.zig");
 
-pub fn runEnhanced(allocator: std.mem.Allocator) !void {
+pub fn runCooler(allocator: std.mem.Allocator) !void {
     var app = App.init(.{
-        .name = "test-enhanced",
-        .allocators = .{ .frame = allocator, .generic = allocator, .world = allocator },
+        .name = "framework",
+        .allocators = .{
+            .frame = allocator,
+            .generic = allocator,
+            .world = allocator,
+        },
     });
     defer app.deinit();
+
+    try app.scheduler.addStage(
+        .{
+            .name = "test",
+            .phase = .update,
+            .run = struct {
+                fn func(a: *App) void {
+                    const time = a.resources.get(Time).?;
+                    std.debug.print("Time Delta: {any}\n", .{time.delta});
+                }
+            }.func,
+        },
+    );
     app.run();
 }
 
@@ -41,7 +55,6 @@ pub fn run(allocator: std.mem.Allocator) !void {
 
         r.draw();
         if (w.isKeyReleased(.@"3")) {
-            std.debug.print("ESCAPE\n", .{});
             break;
         }
     }

@@ -1,6 +1,6 @@
 const std = @import("std");
 const Resources = @This();
-const typeId = @import("type_id.zig").typeIdInt;
+const typeId = @import("type_id").typeIdInt;
 
 allocator: std.mem.Allocator,
 map: std.AutoHashMap(usize, ResourceEntry),
@@ -8,7 +8,7 @@ map: std.AutoHashMap(usize, ResourceEntry),
 pub fn init(allocator: std.mem.Allocator) Resources {
     return .{
         .allocator = allocator,
-        .map = std.AutoHashMap(u64, ResourceEntry).init(allocator),
+        .map = std.AutoHashMap(usize, ResourceEntry).init(allocator),
     };
 }
 

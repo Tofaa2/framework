@@ -1,11 +1,12 @@
 const Self = @This();
 const std = @import("std");
 const log = std.log.scoped(.app);
-const Resources = @import("ResourcePool.zig");
+const Resources = @import("res_pool");
 const Allocator = std.mem.Allocator;
-const Scheduler = @import("scheduler.zig").Scheduler(Self, RunPhase);
-const PluginManager = @import("plugin.zig").PluginManager(Self);
+const Scheduler = @import("scheduler").Scheduler(Self, RunPhase);
+const PluginManager = @import("plugin").PluginManager(Self);
 const ecs = @import("ecs");
+const Time = @import("Time.zig");
 
 pub const RunPhase = enum {
     init,
@@ -27,7 +28,7 @@ pub const AppConfig = struct {
 };
 
 pub fn init(config: AppConfig) Self {
-    return .{
+    var app = Self{
         .name = config.name,
         .resources = Resources.init(config.allocators.generic),
         .allocators = config.allocators,
@@ -38,11 +39,15 @@ pub fn init(config: AppConfig) Self {
             .{ .allocator = config.allocators.generic },
         ) catch unreachable,
     };
+
+    app.resources.add(Time{}) catch unreachable;
+
+    return app;
 }
 
 pub fn deinit(self: *Self) void {
     self.scheduler.run(self, .deinit);
-    self.plugins.deinit();
+    self.plugins.deinit(self);
 
     self.resources.deinit();
 }
@@ -54,10 +59,17 @@ pub fn run(self: *Self) void {
     }
     self.running = true;
 
-    self.plugins.initPlugins(self);
+    self.plugins.initPlugins(self) catch unreachable;
     self.scheduler.run(self, .init);
 
+    {
+        var time = self.resources.getMut(Time);
+        time.?.update(std.time.nanoTimestamp());
+    }
+
     while (self.running) {
+        var time = self.resources.getMut(Time);
+        time.?.update(std.time.nanoTimestamp());
         self.scheduler.run(self, .update);
     }
 }
