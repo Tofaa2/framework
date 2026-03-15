@@ -1,7 +1,7 @@
 const Self = @This();
 const std = @import("std");
 const log = std.log.scoped(.app);
-const Resources = @import("Resources.zig");
+const Resources = @import("ResourcePool.zig");
 const Allocator = std.mem.Allocator;
 const Scheduler = @import("scheduler.zig").Scheduler(Self, RunPhase);
 const PluginManager = @import("plugin.zig").PluginManager(Self);

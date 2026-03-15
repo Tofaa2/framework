@@ -1,6 +1,0 @@
-[
-  {
-    "label": "Run Sandbox",
-    "command": "zig build run -Doptimize=ReleaseFast",
-  },
-]

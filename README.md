@@ -1,21 +1,10 @@
-# framework
-A minimal collection of libraries and tools for building general-purpose applications in zig.
-Framework also comes with an app-sdk which is my flavored implementation of a minimal game engine.
+# Framework
 
+## libs
+`libs` folder contains app-sdk independant libraries that are used thruout the codebase and can also be used independantly
 
-## Installation
-* Open the terminal
-* Run the following command to install the library `zig fetch --save git+https://github.com/Tofaa2/framework`
-* Go to your build.zig file and add any of the modules you need:
-```zig
-pub fn build(b: *std.Build) !void {
-    const exe = ...;
-    const framework_dep = b.dependency("framework");
-    const scheduler_mod = framework_dep.module("framework-scheduler");
-    exe.root_module.addImport("framework-scheduler", scheduler_mod); 
-} 
-```
+## runtime
+`runtime` folder contains the minimal runtime of the app sdk. Features are implemented via plugins
 
-To find a module you are interested in, look in the `src` directory. Each folder is its own module and a README.md file 
-and their module name is "framework-<module_name>".
-
+## plugins
+`plugins` folder contains a bunch of base plugins that can be used to extend the runtime functionality. Such as Window, Renderer, Physics, etc.

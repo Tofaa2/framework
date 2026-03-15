@@ -1,5 +1,5 @@
 const std = @import("std");
-const TypeInfo = @import("type_id.zig").TypeInfo;
+const TypeInfo = @import("type_id").TypeInfo;
 
 pub const TypeErased = struct {
     ptr: *anyopaque,
