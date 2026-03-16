@@ -8,7 +8,6 @@ var bgfx_clbs = zbgfx.callbacks.CCallbackInterfaceT{
     .vtable = &zbgfx.callbacks.DefaultZigCallbackVTable.toVtbl(),
 };
 
-pub const geometry = @import("geometry_builder.zig");
 pub const Viewport = @import("Viewport.zig");
 pub const Image = @import("Image.zig");
 pub const ShaderProgram = @import("ShaderProgram.zig");
@@ -27,13 +26,24 @@ pub const Plugin = struct {
         const framebuffer = w.getFrameBufferSize();
         const width = framebuffer[0];
         const height = framebuffer[1];
-        const renderer = Renderer.init(context.allocators.generic, .{
-            .height = @intCast(height),
-            .width = @intCast(width),
-        }, w.getNativePtr(), false) catch unreachable;
+        const renderer = Renderer.init(
+            context.allocators.generic,
+            .{
+                .height = @intCast(height),
+                .width = @intCast(width),
+            },
+            w.getNativePtr(),
+            false,
+        ) catch unreachable;
         context.resources.add(renderer) catch unreachable;
         context.scheduler.addStage(.{ .name = "renderer", .phase = .update, .run = runUpdate }) catch unreachable;
-        log.info("Renderer Plugin Initialized, NATIVE PTR: {any}", .{renderer});
+
+        w.callbacks.resize.append(w.callbacks.allocator, struct {
+            fn func(wind: *window.api.Window, W: u32, H: u32) void {
+                var app = wind.getData(0, runtime.App).?;
+                app.resources.getMut(Renderer).?.resize(W, H);
+            }
+        }.func) catch unreachable;
     }
 
     pub fn deinit(_: *Plugin, context: *runtime.App) void {
@@ -191,6 +201,15 @@ pub const Renderer = struct {
         };
     }
 
+    pub fn resize(self: *Renderer, width: u32, height: u32) void {
+        self.viewport.width = width;
+        self.viewport.height = height;
+
+        bgfx.setViewRect(0, 0, 0, @intCast(self.viewport.width), @intCast(self.viewport.height));
+        bgfx.setViewClear(0, bgfx.ClearFlags_Color | bgfx.ClearFlags_Depth, 0x303030ff, 1.0, 0.0);
+        bgfx.touch(0);
+    }
+
     pub fn draw(self: *Renderer) void {
         self.accum_time += 1;
         if (self.accum_time > 180000) {
@@ -252,24 +271,6 @@ pub const Renderer = struct {
         // We clear the length but keep the capacity to avoid re-allocating next frame
         self.vertices.items.len = 0;
         self.indices.items.len = 0;
-    }
-    pub fn draw0(self: *Renderer) void {
-        bgfx.setViewClear(0, bgfx.ClearFlags_Color | bgfx.ClearFlags_Depth, 0x303030ff, 1.0, 0.0);
-        bgfx.setViewRect(0, 0, 0, @intCast(self.viewport.width), @intCast(self.viewport.height));
-        bgfx.touch(0);
-
-        bgfx.setViewTransform(0, &math.matToArr(self.view_mtx), &math.matToArr(self.proj_mtx));
-
-        bgfx.setVertexBuffer(0, self.vbh, 0, cube_vertices.len);
-        bgfx.setIndexBuffer(self.ibh, 0, cube_indices.len);
-        const state = bgfx.StateFlags_WriteRgb |
-            bgfx.StateFlags_WriteA |
-            bgfx.StateFlags_WriteZ |
-            bgfx.StateFlags_DepthTestLess;
-        bgfx.setState(state, 0);
-
-        bgfx.submit(0, self.program.program_handle, 0, bgfx.DiscardFlags_All);
-        _ = bgfx.frame(bgfx.FrameFlags_None);
     }
 
     pub fn deinit(self: *Renderer) void {

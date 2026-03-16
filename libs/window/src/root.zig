@@ -6,10 +6,21 @@ pub const c = @cImport({
     @cInclude("RGFW.h");
 });
 
+pub const ResizeCallback = *const fn (*Window, u32, u32) void;
+pub const ResizeCallbacks = std.ArrayListUnmanaged(ResizeCallback);
+
+pub const Callbacks = struct {
+    allocator: std.mem.Allocator = std.heap.c_allocator,
+
+    resize: ResizeCallbacks = .empty,
+};
+
 pub const Window = struct {
     handle: ?*c.RGFW_window,
     width: u32,
     height: u32,
+    data: []usize, // TODO: Probably ArrayList is better
+    callbacks: Callbacks = .{},
 
     pub fn getFrameBufferSize(self: *Window) [2]i32 {
         var width: i32 = undefined;
@@ -29,6 +40,11 @@ pub const Window = struct {
     pub fn isKeyPressed(self: *Window, key: RGFW_key) bool {
         const res = c.RGFW_window_isKeyPressed(self.handle, @intFromEnum(key));
         return res == 1;
+    }
+
+    pub fn getWindowFromNative(handle: ?*c.RGFW_window) ?*Window {
+        const native = c.RGFW_window_getUserPtr(handle);
+        return @as(?*Window, @ptrCast(@alignCast(native)));
     }
 
     pub fn isMouseInside(self: *Window) bool {
@@ -127,6 +143,33 @@ pub const Window = struct {
         return c.RGFW_window_shouldClose(self.handle) == c.RGFW_TRUE;
     }
 
+    pub fn setupCallbacks(self: *Window) void {
+        c.RGFW_window_setUserPtr(self.handle, self);
+        _ = c.RGFW_setWindowResizedCallback(struct {
+            fn func(window: ?*c.RGFW_window, width: i32, height: i32) callconv(.c) void {
+                const our_window = Window.getWindowFromNative(window) orelse {
+                    std.log.err("Failed to cast window pointer to *Window", .{});
+                    return;
+                };
+                our_window.height = @intCast(height);
+                our_window.width = @intCast(width);
+                for (our_window.callbacks.resize.items) |callback| {
+                    callback(our_window, @intCast(width), @intCast(height));
+                }
+            }
+        }.func);
+    }
+
+    pub fn getData(self: *Window, index: usize, comptime T: type) ?*T {
+        if (index >= self.data.len) return null;
+        return @ptrFromInt(self.data[index]);
+    }
+
+    pub fn setData(self: *Window, index: usize, value: *anyopaque) void {
+        if (index >= self.data.len) return;
+        self.data[index] = @intFromPtr(value);
+    }
+
     pub fn init(title: []const u8, width: u32, height: u32) Window {
         const handle = c.RGFW_createWindow(@ptrCast(title.ptr), 0, 0, @intCast(width), @intCast(height), 0);
 
@@ -136,11 +179,13 @@ pub const Window = struct {
             .handle = handle,
             .width = width,
             .height = height,
+            .data = std.heap.c_allocator.alloc(usize, 24) catch unreachable,
         };
     }
 
     pub fn deinit(self: *Window) void {
         c.RGFW_window_close(self.handle);
+        std.heap.c_allocator.free(self.data);
     }
 };
 pub const RGFW_windowFlags = enum(u32) {

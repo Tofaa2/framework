@@ -19,6 +19,8 @@ pub const Plugin = struct {
             }.func,
             .phase = .update,
         }) catch unreachable;
+        context.resources.getMut(window.Window).?.setupCallbacks();
+        context.resources.getMut(window.Window).?.setData(0, context);
         log.info("Window Plugin Initialized: Native PTR: {any}", .{@constCast(&w).getNativePtr()});
     }
 
