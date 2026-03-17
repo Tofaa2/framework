@@ -3,57 +3,36 @@ const Build = std.Build;
 const Module = std.Build.Module;
 const Target = std.Build.ResolvedTarget;
 const Optimize = std.builtin.OptimizeMode;
+const Imports = []const Module.Import;
 
 const zbgfx = @import("zbgfx");
-
-const Imports = []const Module.Import;
 
 pub fn build(b: *Build) !void {
     const target = b.standardTargetOptions(.{});
     const optimize = b.standardOptimizeOption(.{ .preferred_optimize_mode = .Debug });
 
-    const math = @import("libs/math/build.zig").apply(b, target, optimize);
-    const type_id = @import("libs/type_id/build.zig").apply(b, target, optimize);
-    const window = @import("libs/window/build.zig").apply(b, target, optimize);
-    const stb = @import("libs/stb/build.zig").apply(b, target, optimize);
-    const dyn = @import("libs/dyn/build.zig").apply(b, target, optimize);
-    const plugin = @import("libs/plugin/build.zig").apply(b, target, optimize);
-    const res_pool = @import("libs/res_pool/build.zig").apply(b, target, optimize);
-    const scheduler = @import("libs/scheduler/build.zig").apply(b, target, optimize);
-
-    const runtime = buildRuntime(b, target, optimize, &.{
-        .{ .name = "math", .module = math },
-        .{ .name = "stb", .module = stb },
-        .{ .name = "window", .module = window },
-        .{ .name = "dyn", .module = dyn },
-        .{ .name = "type_id", .module = type_id },
-        .{ .name = "plugin", .module = plugin },
-        .{ .name = "res_pool", .module = res_pool },
-        .{ .name = "scheduler", .module = scheduler },
-    });
-    linkSimpleModDep(b, runtime, "entt", "ecs", "zig-ecs");
-
-    const window_plugin = @import("plugins/window/build.zig").apply(b, target, optimize);
-    const renderer_plugin = @import("plugins/renderer/build.zig").apply(b, target, optimize);
-
-    buildSandbox(b, target, optimize, &.{
-        .{ .name = "framework-runtime", .module = runtime },
-        .{ .name = "window", .module = window_plugin },
-        .{ .name = "renderer", .module = renderer_plugin },
-    });
-}
-fn exportLib(b: *std.Build, target: Target, optimize: Optimize, impl: anytype) *Module {
-    return impl.apply(b, target, optimize);
-}
-
-fn buildRuntime(b: *Build, target: Target, optimize: Optimize, imports: Imports) *Module {
     const runtime = b.addModule("runtime", .{
-        .root_source_file = b.path("runtime/root.zig"),
+        .link_libc = true,
+        .link_libcpp = true,
         .optimize = optimize,
         .target = target,
-        .imports = imports,
+        .root_source_file = b.path("src/root.zig"),
     });
-    return runtime;
+    linkSimpleModDep(b, runtime, "entt", "ecs", "zig-ecs");
+    runtime.addIncludePath(b.path("thirdparty/"));
+    runtime.addCSourceFiles(.{
+        .files = &.{"RGFW_Impl.c"},
+        .root = b.path("thirdparty/"),
+    });
+
+    switch (target.result.os.tag) {
+        .windows => {
+            runtime.linkSystemLibrary("gdi32", .{ .needed = true });
+        },
+        else => {},
+    }
+
+    buildSandbox(b, target, optimize, &.{.{ .name = "runtime", .module = runtime }});
 }
 
 fn buildSandbox(b: *Build, target: Target, optimize: Optimize, imports: Imports) void {
@@ -87,4 +66,33 @@ fn linkSimpleModDepWithArtifact(b: *std.Build, module: *std.Build.Module, dep_na
     const mod = dep.module(mod_name);
     module.addImport(name, mod);
     module.linkLibrary(dep.artifact(artifact));
+}
+
+fn linkBgfx(b: *std.Build, target: std.Build.ResolvedTarget, optimize: std.builtin.OptimizeMode, runtime: *std.Build.Module) !void {
+    _ = optimize;
+    const zbgfx_dep = b.dependency("zbgfx", .{});
+    runtime.addImport("bgfx", zbgfx_dep.module("zbgfx"));
+    runtime.linkLibrary(zbgfx_dep.artifact("bgfx"));
+    const install_shaderc_step = try zbgfx.build_step.installShaderc(b, zbgfx_dep);
+    const shaders_includes = &.{zbgfx_dep.path("shaders")};
+    const shaders_module = try zbgfx.build_step.compileShaders(
+        b,
+        target,
+        install_shaderc_step,
+        zbgfx_dep,
+        shaders_includes,
+        &.{
+            .{
+                .name = "fs_basic",
+                .shaderType = .fragment,
+                .path = b.path("src/renderer/shaders/fs_basic.sc"),
+            },
+            .{
+                .name = "vs_basic",
+                .shaderType = .vertex,
+                .path = b.path("src/renderer/shaders/vs_basic.sc"),
+            },
+        },
+    );
+    runtime.addImport("shader_module", shaders_module);
 }
