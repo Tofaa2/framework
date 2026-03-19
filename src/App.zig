@@ -22,8 +22,6 @@ allocators: Allocators,
 scheduler: Scheduler,
 world: ecs.Registry,
 running: bool,
-// window: root.platform.Window,
-// renderer: root.renderer.Renderer,
 
 pub const AppConfig = struct {
     name: []const u8 = "framework-app",
@@ -100,73 +98,159 @@ pub fn run(self: *Self) void {
         _ = self.allocators.frame_arena.reset(.retain_capacity);
     }
 }
-
 fn renderPrimitive(self: *Self, renderer: *root.renderer.Renderer) void {
     var query = self.world.view(.{ root.primitive.Transform, root.primitive.Renderable }, .{});
     var iter = query.entityIterator();
+    const view_2d = renderer.getView(.@"2d").?;
+    const allocator = self.allocators.generic;
 
+    var builder = root.renderer.MeshBuilder.init(allocator);
+    defer builder.deinit();
+
+    // pass 1: untextured
     while (iter.next()) |entity| {
         const transform = query.getConst(root.primitive.Transform, entity);
         const renderable = query.getConst(root.primitive.Renderable, entity);
-
         var tint: root.primitive.Color = .white;
         if (self.world.tryGetConst(root.primitive.Color, entity)) |color| {
             tint = color;
         }
-
         switch (renderable) {
             .circle => |circle| {
                 const segments: u32 = circle.segments orelse 16;
-
-                var batch_2d = renderer.getView(.@"2d").?.createBatch();
-                batch_2d.pushCircle(
-                    transform.center[0],
-                    transform.center[1],
-                    circle.radius,
-                    segments,
-                    tint,
-                );
+                // build at origin, transform moves it
+                builder.pushCircle(0.0, 0.0, circle.radius, segments, tint);
+                builder.submitTransient(view_2d, null, null, transform.toMatrix());
+                builder.reset();
             },
             .rect => |rect| {
-                var batch_2d = renderer.getView(.@"2d").?.createBatch();
-                batch_2d.pushRect(transform.center[0], transform.center[1], rect.width, rect.height, tint);
+                // centered at origin
+                builder.pushRect(-rect.width * 0.5, -rect.height * 0.5, rect.width, rect.height, tint);
+                builder.submitTransient(view_2d, null, null, transform.toMatrix());
+                builder.reset();
             },
+            else => {},
+        }
+    }
+
+    // pass 2: textured
+    iter = query.entityIterator();
+    while (iter.next()) |entity| {
+        const transform = query.getConst(root.primitive.Transform, entity);
+        const renderable = query.getConst(root.primitive.Renderable, entity);
+        var tint: root.primitive.Color = .white;
+        if (self.world.tryGetConst(root.primitive.Color, entity)) |color| {
+            tint = color;
+        }
+        switch (renderable) {
             .sprite => |sprite| {
                 const w = @as(f32, @floatFromInt(sprite.image.width));
                 const h = @as(f32, @floatFromInt(sprite.image.height));
-                var sprite_batch = renderer.getView(.@"2d").?.createBatch();
-                sprite_batch.texture = sprite.image;
-                sprite_batch.pushTexturedRect(
+                builder.pushTexturedRect(-w * 0.5, -h * 0.5, w, h, tint);
+                builder.submitTransient(view_2d, null, sprite.image, transform.toMatrix());
+                builder.reset();
+            },
+            .text => |t| {
+                builder.pushText(t.font, t.content, 0.0, 0.0, tint);
+                builder.submitTransient(view_2d, null, &t.font.atlas, transform.toMatrix());
+                builder.reset();
+            },
+            .fmt_text => |*t| {
+                const text = t.format_fn(t.buf, self);
+                builder.pushText(t.font, text, 0.0, 0.0, tint);
+                builder.submitTransient(view_2d, null, &t.font.atlas, transform.toMatrix());
+                builder.reset();
+            },
+            else => {},
+        }
+    }
+
+    // pass 3: 3D meshes
+    const view_3d = renderer.getView(.@"3d").?;
+    iter = query.entityIterator();
+    while (iter.next()) |entity| {
+        var transform = query.getConst(root.primitive.Transform, entity);
+        const renderable = query.getConst(root.primitive.Renderable, entity);
+        switch (renderable) {
+            .mesh => |*m| {
+                m.mesh.transform = transform.toMatrix();
+                view_3d.addMesh(m.mesh);
+            },
+            else => {},
+        }
+    }
+}
+fn renderPrimitive0(self: *Self, renderer: *root.renderer.Renderer) void {
+    var query = self.world.view(.{ root.primitive.Transform, root.primitive.Renderable }, .{});
+    var iter = query.entityIterator();
+    const view = renderer.getView(.@"2d").?;
+    const allocator = self.allocators.generic;
+
+    var builder = root.renderer.MeshBuilder.init(allocator);
+    defer builder.deinit();
+
+    // pass 1: all untextured geometry (circles, rects, lines)
+    while (iter.next()) |entity| {
+        const transform = query.getConst(root.primitive.Transform, entity);
+        const renderable = query.getConst(root.primitive.Renderable, entity);
+        var tint: root.primitive.Color = .white;
+        if (self.world.tryGetConst(root.primitive.Color, entity)) |color| {
+            tint = color;
+        }
+        switch (renderable) {
+            .circle => |circle| {
+                const segments: u32 = circle.segments orelse 16;
+                builder.pushCircle(transform.center[0], transform.center[1], circle.radius, segments, tint);
+            },
+            .rect => |rect| {
+                builder.pushRect(transform.center[0], transform.center[1], rect.width, rect.height, tint);
+            },
+            else => {},
+        }
+    }
+    builder.submitTransient(view, null, null, null);
+    builder.reset();
+
+    // pass 2: textured geometry grouped by texture
+    // reset iterator
+    iter = query.entityIterator();
+    while (iter.next()) |entity| {
+        const transform = query.getConst(root.primitive.Transform, entity);
+        const renderable = query.getConst(root.primitive.Renderable, entity);
+        var tint: root.primitive.Color = .white;
+        if (self.world.tryGetConst(root.primitive.Color, entity)) |color| {
+            tint = color;
+        }
+        switch (renderable) {
+            .sprite => |sprite| {
+                const w = @as(f32, @floatFromInt(sprite.image.width));
+                const h = @as(f32, @floatFromInt(sprite.image.height));
+                builder.pushTexturedRect(
                     transform.center[0] - w * 0.5,
                     transform.center[1] - h * 0.5,
                     w,
                     h,
                     tint,
                 );
+                builder.submitTransient(view, null, sprite.image, null);
+                builder.reset();
             },
             .text => |t| {
-                var text_batch = renderer.getView(.@"2d").?.createBatch();
-                text_batch.texture = &t.font.atlas;
-                text_batch.pushText(
-                    t.font,
-                    t.content,
-                    transform.center[0],
-                    transform.center[1],
-                    tint,
-                );
+                builder.pushText(t.font, t.content, transform.center[0], transform.center[1], tint);
+                builder.submitTransient(view, null, &t.font.atlas, null);
+                builder.reset();
             },
             .fmt_text => |*t| {
                 const text = t.format_fn(t.buf, self);
-                var text_batch = renderer.getView(.@"2d").?.createBatch();
-                text_batch.texture = &t.font.atlas;
-                text_batch.pushText(t.font, text, transform.center[0], transform.center[1], tint);
+                builder.pushText(t.font, text, transform.center[0], transform.center[1], tint);
+                builder.submitTransient(view, null, &t.font.atlas, null);
+                builder.reset();
             },
-            // else => {
-            //     @panic("Not implemented yet!");
-            // },
+            else => {},
         }
     }
 }
+
 fn updateFps(app: *Self) void {
     const time = app.resources.get(Time).?;
     app.resources.getMut(root.primitive.FpsCounter).?.update(@floatCast(time.delta));

@@ -11,7 +11,21 @@ yaw: f32 = -std.math.pi / 2.0, // facing -Z by default
 pitch: f32 = 0.0,
 sensitivity: f32 = 0.002,
 pitch_clamp: f32 = std.math.pi / 2.0 - 0.01, // prevent gimbal lock
-
+pub fn init() Camera3D {
+    var cam = Camera3D{
+        .position = zm.f32x4(0.0, 0.0, -10.0, 1.0),
+        .up = zm.f32x4(0.0, 1.0, 0.0, 0.0),
+        .speed = 5.0,
+        .yaw = std.math.pi / 2.0,
+        .pitch = 0.0,
+        .sensitivity = 0.002,
+        .pitch_clamp = std.math.pi / 2.0 - 0.01,
+        .target = zm.f32x4(0.0, 0.0, 0.0, 1.0),
+    };
+    // sync target with yaw/pitch
+    cam.rotate(0, 0);
+    return cam;
+}
 pub fn rotate(self: *Camera3D, dx: f32, dy: f32) void {
     self.yaw += dx * self.sensitivity;
     self.pitch -= dy * self.sensitivity; // subtract because Y is flipped

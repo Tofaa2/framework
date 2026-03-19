@@ -2,7 +2,7 @@ const Image = @import("Image.zig");
 const Font = @import("Font.zig");
 const std = @import("std");
 const App = @import("../App.zig");
-
+const Mesh = @import("../renderer/Mesh.zig");
 pub const Renderable = union(enum) {
     circle: struct {
         radius: f32,
@@ -25,5 +25,8 @@ pub const Renderable = union(enum) {
         buf: []u8, // caller-provided buffer, no allocation needed
         len: usize = 0, // current length of formatted text
         format_fn: *const fn (buf: []u8, app: *App) []u8,
+    },
+    mesh: struct {
+        mesh: *Mesh,
     },
 };

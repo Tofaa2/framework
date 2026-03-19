@@ -1,9 +1,13 @@
 const Self = @This();
 const std = @import("std");
 const math = @import("math.zig");
-const Batch = @import("RenderBatch.zig");
 const Color = @import("../primitive/Color.zig");
 const bgfx = @import("bgfx").bgfx;
+const Vertex = @import("Vertex.zig");
+const ShaderProgram = @import("ShaderProgram.zig");
+const Image = @import("../primitive/Image.zig");
+const Mesh = @import("Mesh.zig");
+const DynamicMesh = @import("DynamicMesh.zig");
 
 pub const Map = std.AutoArrayHashMap(Id, Self);
 
@@ -21,11 +25,24 @@ model_mtx: math.Mat = math.identity(),
 clear_color: Color = .black,
 clear_flags: u16 = bgfx.ClearFlags_Color | bgfx.ClearFlags_Depth,
 
-batches: std.ArrayList(Batch) = .empty,
+transient_submissions: std.ArrayList(TransientSubmission) = .empty,
+meshes: std.ArrayList(*Mesh) = .empty,
+dynamic_meshes: std.ArrayList(*DynamicMesh) = .empty,
+
 allocator: std.mem.Allocator,
 
-pub fn createBatch(self: *@This()) *Batch {
-    const batch = Batch.init(self.allocator, null, null);
-    self.batches.append(self.allocator, batch) catch unreachable;
-    return &self.batches.items[self.batches.items.len - 1];
+pub fn addMesh(self: *Self, mesh: *Mesh) void {
+    self.meshes.append(self.allocator, mesh) catch unreachable;
 }
+
+pub fn addDynamicMesh(self: *Self, mesh: *DynamicMesh) void {
+    self.dynamic_meshes.append(self.allocator, mesh) catch unreachable;
+}
+
+pub const TransientSubmission = struct {
+    vertices: []Vertex,
+    indices: []u16,
+    shader: ?ShaderProgram,
+    texture: ?*const Image,
+    transform: ?math.Mat,
+};

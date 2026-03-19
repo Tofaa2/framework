@@ -52,14 +52,6 @@ pub fn build(b: *Build) !void {
     const test_step = b.step("test", "Run tests");
     test_step.dependOn(&run_mod_tests.step);
     test_step.dependOn(&run_exe_tests.step);
-
-    mod_tests.root_module.addCMacro("__INTMAX_C_SUFFIX__", "");
-    mod_tests.root_module.addCMacro("__UINTMAX_C_SUFFIX", "");
-    mod_tests.root_module.addCMacro("__INT64_C_SUFFIX__", "");
-
-    exe_tests.root_module.addCMacro("__INTMAX_C_SUFFIX__", "");
-    exe_tests.root_module.addCMacro("__UINTMAX_C_SUFFIX__", "");
-    exe_tests.root_module.addCMacro("__INT64_C_SUFFIX__", "");
 }
 
 fn buildSandbox(b: *Build, target: Target, optimize: Optimize, imports: Imports) *Build.Step.Compile {

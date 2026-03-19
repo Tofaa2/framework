@@ -14,9 +14,12 @@ pub const ShaderProgram = @import("ShaderProgram.zig");
 pub const log = std.log.scoped(.renderer);
 const isValid = @import("bgfx_util.zig").isValid;
 pub const Color = @import("../primitive/Color.zig");
-pub const RenderBatch = @import("RenderBatch.zig");
 pub const View = @import("View.zig");
 pub const Vertex = @import("Vertex.zig");
+pub const MeshBuilder = @import("MeshBuilder.zig");
+pub const Mesh = @import("Mesh.zig");
+pub const DynamicMesh = @import("DynamicMesh.zig");
+pub const ObjLoader = @import("ObjLoader.zig");
 
 pub const Renderer = struct {
     allocator: std.mem.Allocator,
@@ -136,7 +139,6 @@ pub const Renderer = struct {
             bgfx.setViewTransform(view_id, &math.matToArr(view.view_mtx), &math.matToArr(view.proj_mtx));
             bgfx.touch(view_id);
         }
-
         iter = self.views.iterator();
         while (iter.next()) |entry| {
             const view = entry.value_ptr;
@@ -147,47 +149,72 @@ pub const Renderer = struct {
 
     fn drawView(self: *Renderer, view: *View) void {
         const view_id: u8 = @intFromEnum(view.id);
-        for (view.batches.items) |batch| {
-            if (batch.transform) |transform| {
-                _ = bgfx.setTransform(&math.matToArr(zm.transpose(transform)), 1);
-            }
-            const state = bgfx.StateFlags_WriteRgb |
-                bgfx.StateFlags_WriteA |
-                bgfx.StateFlags_WriteZ |
-                bgfx.StateFlags_DepthTestLess;
-            // const state = bgfx.StateFlags_WriteRgb |
-            //     bgfx.StateFlags_WriteA |
-            //     bgfx.StateFlags_WriteZ |
-            //     bgfx.StateFlags_DepthTestLess;
-            bgfx.setState(state, 0);
 
-            if (batch.texture) |tex| {
-                bgfx.setTexture(0, self.tex_uniform, tex.handle, std.math.maxInt(u32));
-            } else {
-                bgfx.setTexture(0, self.tex_uniform, self.white_texture.handle, std.math.maxInt(u32));
+        // static meshes
+        for (view.meshes.items) |mesh| {
+            if (mesh.transform) |t| {
+                _ = bgfx.setTransform(&math.matToArr(zm.transpose(t)), 1);
             }
+            self.setState(mesh.texture);
+            bgfx.setVertexBuffer(0, mesh.vbh, 0, mesh.num_vertices);
+            bgfx.setIndexBuffer(mesh.ibh, 0, mesh.num_indices);
+            const program = if (mesh.shader) |s| s.program_handle else self.program.program_handle;
+            _ = bgfx.submit(view_id, program, 0, bgfx.DiscardFlags_All);
+        }
 
+        // dynamic meshes
+        for (view.dynamic_meshes.items) |mesh| {
+            if (mesh.transform) |t| {
+                _ = bgfx.setTransform(&math.matToArr(zm.transpose(t)), 1);
+            }
+            self.setState(mesh.texture);
+            bgfx.setDynamicVertexBuffer(0, mesh.vbh, 0, mesh.num_vertices);
+            bgfx.setDynamicIndexBuffer(mesh.ibh, 0, mesh.num_indices);
+            const program = if (mesh.shader) |s| s.program_handle else self.program.program_handle;
+            _ = bgfx.submit(view_id, program, 0, bgfx.DiscardFlags_All);
+        }
+
+        // transient submissions
+        for (view.transient_submissions.items) |sub| {
+            if (sub.transform) |t| {
+                _ = bgfx.setTransform(&math.matToArr(zm.transpose(t)), 1);
+            }
+            self.setState(sub.texture);
             var tvb: bgfx.TransientVertexBuffer = undefined;
             var tib: bgfx.TransientIndexBuffer = undefined;
-            if (!bgfx.allocTransientBuffers(&tvb, &self.vertex_layout, @intCast(batch.vertices.items.len), &tib, @intCast(batch.indices.items.len), false)) {
-                log.err("Failed to allocate transient buffers for batch", .{});
-                return;
+            if (!bgfx.allocTransientBuffers(&tvb, &self.vertex_layout, @intCast(sub.vertices.len), &tib, @intCast(sub.indices.len), false)) {
+                log.err("Failed to allocate transient buffers", .{});
+                continue;
             }
-            @memcpy(tvb.data[0..(@sizeOf(Vertex) * batch.vertices.items.len)], std.mem.sliceAsBytes(batch.vertices.items));
-            @memcpy(tib.data[0..(batch.indices.items.len * 2)], std.mem.sliceAsBytes(batch.indices.items));
-
-            bgfx.setTransientVertexBuffer(0, &tvb, 0, @intCast(batch.vertices.items.len));
-            bgfx.setTransientIndexBuffer(&tib, 0, @intCast(batch.indices.items.len));
-
-            const program_handle = if (batch.shader) |shader| shader.program_handle else self.program.program_handle;
-
-            _ = bgfx.submit(view_id, program_handle, 0, bgfx.DiscardFlags_All);
+            @memcpy(tvb.data[0..(@sizeOf(Vertex) * sub.vertices.len)], std.mem.sliceAsBytes(sub.vertices));
+            @memcpy(tib.data[0..(sub.indices.len * 2)], std.mem.sliceAsBytes(sub.indices));
+            bgfx.setTransientVertexBuffer(0, &tvb, 0, @intCast(sub.vertices.len));
+            bgfx.setTransientIndexBuffer(&tib, 0, @intCast(sub.indices.len));
+            const program = if (sub.shader) |s| s.program_handle else self.program.program_handle;
+            _ = bgfx.submit(view_id, program, 0, bgfx.DiscardFlags_All);
         }
-        for (view.batches.items) |*batch| {
-            batch.vertices.clearRetainingCapacity();
-            batch.indices.clearRetainingCapacity();
+
+        // clear transient submissions
+        for (view.transient_submissions.items) |sub| {
+            self.allocator.free(sub.vertices);
+            self.allocator.free(sub.indices);
         }
-        view.batches.clearRetainingCapacity();
+        view.meshes.clearRetainingCapacity();
+        view.dynamic_meshes.clearRetainingCapacity();
+        view.transient_submissions.clearRetainingCapacity();
+    }
+
+    fn setState(self: *Renderer, texture: ?*const Image) void {
+        const state = bgfx.StateFlags_WriteRgb |
+            bgfx.StateFlags_WriteA |
+            bgfx.StateFlags_WriteZ |
+            bgfx.StateFlags_DepthTestLess;
+        bgfx.setState(state, 0);
+        if (texture) |tex| {
+            bgfx.setTexture(0, self.tex_uniform, tex.handle, std.math.maxInt(u32));
+        } else {
+            bgfx.setTexture(0, self.tex_uniform, self.white_texture.handle, std.math.maxInt(u32));
+        }
     }
 
     pub fn deinit(self: *Renderer) void {

@@ -18,6 +18,7 @@ pub const Window = struct {
     height: u32,
     data: []usize, // TODO: Probably ArrayList is better
     callbacks: Callbacks = .{},
+    mouse_delta: [2]f32 = .{ 0.0, 0.0 },
     resized_last_frame: bool = false,
     pub fn getFrameBufferSize(self: *Window) [2]i32 {
         var width: i32 = undefined;
@@ -112,6 +113,7 @@ pub const Window = struct {
     pub fn update(self: *Window) void {
         const old_width = self.width;
         const old_height = self.height;
+        self.mouse_delta = .{ 0.0, 0.0 };
 
         var event: c.RGFW_event = undefined;
         while (c.RGFW_window_checkEvent(self.handle, &event) == 1) {
@@ -119,20 +121,27 @@ pub const Window = struct {
                 c.RGFW_window_setShouldClose(self.handle, @intFromBool(true));
                 break;
             }
+            if (event.type == c.RGFW_mousePosChanged) {
+                self.mouse_delta[0] += event.mouse.vecX;
+                self.mouse_delta[1] += event.mouse.vecY;
+            }
         }
+
         var new_w: i32 = undefined;
         var new_h: i32 = undefined;
         _ = c.RGFW_window_getSize(self.handle, &new_w, &new_h);
         self.width = @intCast(new_w);
         self.height = @intCast(new_h);
-        c.RGFW_pollEvents();
+
         if (old_width != self.width or old_height != self.height) {
             self.resized_last_frame = true;
         } else {
             self.resized_last_frame = false;
         }
     }
-
+    pub fn getMouseDelta(self: *Window) [2]f32 {
+        return self.mouse_delta;
+    }
     pub fn setFlagsRaw(self: *Window, flags: u32) void {
         c.RGFW_window_setFlags(self.handle, flags);
     }
@@ -179,7 +188,17 @@ pub const Window = struct {
         if (index >= self.data.len) return;
         self.data[index] = @intFromPtr(value);
     }
-
+    pub fn setMouseCaptured(self: *Window, captured: bool) void {
+        const current = self.getFlags();
+        const flags = @intFromEnum(RGFW_windowFlags.capture_mouse) |
+            @intFromEnum(RGFW_windowFlags.hide_mouse) |
+            @intFromEnum(RGFW_windowFlags.raw_mouse);
+        if (captured) {
+            c.RGFW_window_setFlags(self.handle, current | flags);
+        } else {
+            c.RGFW_window_setFlags(self.handle, current & ~flags);
+        }
+    }
     pub fn init(title: []const u8, width: u32, height: u32) Window {
         const handle = c.RGFW_createWindow(@ptrCast(title.ptr), 0, 0, @intCast(width), @intCast(height), 0);
 

@@ -26,74 +26,95 @@ pub fn main() !void {
 
     var font = runtime.primitive.Font.initFile("assets/Roboto-Regular.ttf", 32, 512);
     defer font.deinit();
+    // in main after app.init
+    const camera_3d = runtime.primitive.Camera3D.init();
+    application.resources.add(camera_3d) catch unreachable;
 
-    const camera = runtime.primitive.Camera2D{};
-    application.resources.add(camera) catch unreachable;
-
+    application.scheduler.addStage(.{
+        .name = "camera_3d",
+        .phase = .update,
+        .priority = 80,
+        .run = struct {
+            fn f(app: *runtime.App) void {
+                const cam = app.resources.getMut(runtime.primitive.Camera3D) orelse return;
+                const renderer = app.resources.getMut(runtime.renderer.Renderer) orelse return;
+                renderer.getView(.@"3d").?.view_mtx = cam.getViewMatrix();
+            }
+        }.f,
+    }) catch unreachable;
     var binds = runtime.primitive.Keybinds.init(allocator);
-    binds.bind(.{
-        .key = .w,
-        .on_held = struct {
-            fn f(app: *runtime.App) void {
-                const dt = app.resources.get(runtime.primitive.Time).?.delta;
-                app.resources.getMut(runtime.primitive.Camera2D).?.move(0, @floatCast(-300.0 * dt));
-            }
-        }.f,
-    });
-    binds.bind(.{
-        .key = .s,
-        .on_held = struct {
-            fn f(app: *runtime.App) void {
-                const dt = app.resources.get(runtime.primitive.Time).?.delta;
-                app.resources.getMut(runtime.primitive.Camera2D).?.move(0, @floatCast(300.0 * dt));
-            }
-        }.f,
-    });
-    binds.bind(.{
-        .key = .a,
-        .on_held = struct {
-            fn f(app: *runtime.App) void {
-                const dt = app.resources.get(runtime.primitive.Time).?.delta;
-                app.resources.getMut(runtime.primitive.Camera2D).?.move(@floatCast(-300.0 * dt), 0);
-            }
-        }.f,
-    });
-    binds.bind(.{
-        .key = .d,
-        .on_held = struct {
-            fn f(app: *runtime.App) void {
-                const dt = app.resources.get(runtime.primitive.Time).?.delta;
-                app.resources.getMut(runtime.primitive.Camera2D).?.move(@floatCast(300.0 * dt), 0);
-            }
-        }.f,
-    });
-    binds.bind(.{
-        .key = .q,
-        .on_held = struct {
-            fn f(app: *runtime.App) void {
-                const dt = app.resources.get(runtime.primitive.Time).?.delta;
-                app.resources.getMut(runtime.primitive.Camera2D).?.zoomBy(@floatCast(-1.0 * dt));
-            }
-        }.f,
-    });
-    binds.bind(.{
-        .key = .e,
-        .on_held = struct {
-            fn f(app: *runtime.App) void {
-                const dt = app.resources.get(runtime.primitive.Time).?.delta;
-                app.resources.getMut(runtime.primitive.Camera2D).?.zoomBy(@floatCast(1.0 * dt));
-            }
-        }.f,
-    });
-    application.resources.add(binds) catch unreachable;
-    application.scheduler.addStage(.{ .name = "keybinds", .phase = .update, .run = struct {
+    binds.bind(.{ .key = .w, .on_held = struct {
         fn f(app: *runtime.App) void {
-            app.resources.getMut(runtime.primitive.Keybinds).?.update(app);
+            const dt: f32 = @floatCast(app.resources.get(runtime.primitive.Time).?.delta);
+            app.resources.getMut(runtime.primitive.Camera3D).?.moveForward(dt);
         }
-    }.f }) catch unreachable;
+    }.f });
 
-    application.scheduler.addStage(.{ .name = "camera", .phase = .update, .run = updateCamera }) catch unreachable;
+    binds.bind(.{ .key = .s, .on_held = struct {
+        fn f(app: *runtime.App) void {
+            const dt: f32 = @floatCast(app.resources.get(runtime.primitive.Time).?.delta);
+            app.resources.getMut(runtime.primitive.Camera3D).?.moveBackward(dt);
+        }
+    }.f });
 
+    binds.bind(.{ .key = .a, .on_held = struct {
+        fn f(app: *runtime.App) void {
+            const dt: f32 = @floatCast(app.resources.get(runtime.primitive.Time).?.delta);
+            app.resources.getMut(runtime.primitive.Camera3D).?.moveLeft(dt);
+        }
+    }.f });
+
+    binds.bind(.{ .key = .d, .on_held = struct {
+        fn f(app: *runtime.App) void {
+            const dt: f32 = @floatCast(app.resources.get(runtime.primitive.Time).?.delta);
+            app.resources.getMut(runtime.primitive.Camera3D).?.moveRight(dt);
+        }
+    }.f });
+    binds.bind(.{ .key = .escape, .on_press = struct {
+        fn f(app: *runtime.App) void {
+            app.resources.getMut(runtime.platform.Window).?.setMouseCaptured(false);
+        }
+    }.f });
+    binds.bind(.{ .key = .space, .on_held = struct {
+        fn f(app: *runtime.App) void {
+            const dt: f32 = @floatCast(app.resources.get(runtime.primitive.Time).?.delta);
+            app.resources.getMut(runtime.primitive.Camera3D).?.moveUp(dt);
+        }
+    }.f });
+
+    binds.bind(.{ .key = .shiftL, .on_held = struct {
+        fn f(app: *runtime.App) void {
+            const dt: f32 = @floatCast(app.resources.get(runtime.primitive.Time).?.delta);
+            app.resources.getMut(runtime.primitive.Camera3D).?.moveDown(dt);
+        }
+    }.f });
+    application.resources.getMut(runtime.platform.Window).?.setMouseCaptured(true);
+    application.resources.add(binds) catch unreachable;
+    application.scheduler.addStage(.{
+        .name = "keybinds",
+        .phase = .update,
+        .priority = 90,
+        .run = struct {
+            fn f(app: *runtime.App) void {
+                app.resources.getMut(runtime.primitive.Keybinds).?.update(app);
+            }
+        }.f,
+    }) catch unreachable;
+    application.scheduler.addStage(.{
+        .name = "mouse_look",
+        .phase = .update,
+        .priority = 90,
+        .run = struct {
+            fn f(app: *runtime.App) void {
+                const cam = app.resources.getMut(runtime.primitive.Camera3D) orelse return;
+                var win = app.resources.getMut(runtime.platform.Window).?;
+                const delta = win.getMouseDelta();
+                if (delta[0] != 0 or delta[1] != 0) {
+                    cam.rotate(delta[0], delta[1]);
+                }
+            }
+        }.f,
+    }) catch unreachable;
     const circle = application.world.create();
     application.world.add(circle, runtime.primitive.Transform{
         .center = .{ 100.0, 100.0, 0.0 },
@@ -121,10 +142,23 @@ pub fn main() !void {
     } });
 
     application.resources.getMut(runtime.primitive.Time).?.fps_limit = 165;
+    const renderer = application.resources.getMut(runtime.renderer.Renderer).?;
 
+    var obj_builder = runtime.renderer.MeshBuilder.init(allocator);
+    defer obj_builder.deinit();
+    try runtime.renderer.ObjLoader.load(allocator, "assets/chicken.obj", &obj_builder);
+    var obj_mesh = obj_builder.buildMesh(&renderer.vertex_layout);
+    const mesh_entity = application.world.create();
+    application.world.add(mesh_entity, runtime.primitive.Transform{
+        .center = .{ 0.0, 0.0, 0.0 },
+        .size = .{ 0.05, 0.05, 0.05 },
+        .rotation = .{ 0.5, 0.0, 0.0 },
+    });
+    application.world.add(mesh_entity, runtime.primitive.Renderable{ .mesh = .{ .mesh = &obj_mesh } });
     application.run();
 }
-fn updateCamera(app: *runtime.App) void {
+
+fn updateCamera2d(app: *runtime.App) void {
     const cam = app.resources.getMut(runtime.primitive.Camera2D) orelse return;
     const renderer = app.resources.getMut(runtime.renderer.Renderer) orelse return;
     renderer.getView(.@"2d").?.view_mtx = cam.getViewMatrix();
