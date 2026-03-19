@@ -5,11 +5,12 @@ The main principle for this engine is everything is a resource. From basic stuff
 
 
 ## TODO:
-[ ] Restructure renderbatch and views to support proper optimizations for each type of renderable, at the moment we use transient buffers which is only good for per-frame geometry like text
-[ ] Fix memory leaks (im lazy, most of them are shutdown logic)
-[ ] Improve camera system
-[ ] Introduce more primitives and renderables
-[ ] Static mesh rendering
-[ ] Basic Physics
-[ ] Materials, lighting, render passes
-[ ] Introduce a better pipeline and more views, atm we only have @"2d" for 2d rendering and @"3d" for 3d rendering
+- [ ] Restructure renderbatch and views to support proper optimizations for each type of renderable, at the moment we use transient buffers which is only good for per-frame geometry like text
+- [ ] Fix memory leaks (im lazy, most of them are shutdown logic)
+- [ ] Improve camera system
+- [ ] Introduce more primitives and renderables
+- [ ] Static mesh rendering
+- [ ] Basic Physics
+- [ ] Materials, lighting, render passes
+- [ ] Introduce a better pipeline and more views, atm we only have @"2d" for 2d rendering and @"3d" for 3d rendering
+- [ ] Let user take cli arguments easily, allowing for cli args for renderer type etc.
