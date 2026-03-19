@@ -3,7 +3,7 @@ const Self = @This();
 start: i128 = 0,
 delta: f64 = 0,
 last_frame: i128 = 0,
-
+fps_limit: ?u32 = null, // null = unlimited
 pub fn update(self: *Self, current_time: i128) void {
     if (self.last_frame == 0) {
         self.last_frame = current_time;

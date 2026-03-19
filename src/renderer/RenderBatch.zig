@@ -21,6 +21,10 @@ transform: ?math.Mat,
 is_transient: bool = false,
 is_static: bool = false,
 
+pub fn isEmpty(self: *const RenderBatch) bool {
+    return self.vertices.items.len == 0 and self.indices.items.len == 0;
+}
+
 pub fn init(allocator: std.mem.Allocator, shader: ?ShaderProgram, texture: ?*const Image) RenderBatch {
     return .{
         .allocator = allocator,
@@ -43,18 +47,18 @@ pub fn pushText(self: *RenderBatch, font: *const Font, text: []const u8, x: f32,
     var cursor_x = x;
     for (text) |char| {
         const glyph = font.getGlyph(char) orelse continue;
-
         const x0 = cursor_x + glyph.x_offset;
-        const y0 = y - glyph.y_offset; // negate y_offset
+        const y0 = y + glyph.y_offset;
         const x1 = x0 + glyph.width;
         const y1 = y0 + glyph.height;
 
         self.pushQuad(
-            .init(.{ x0, y1, 0.0 }, color, .{ glyph.u0, glyph.v0 }),
-            .init(.{ x1, y1, 0.0 }, color, .{ glyph.u1, glyph.v0 }),
-            .init(.{ x1, y0, 0.0 }, color, .{ glyph.u1, glyph.v1 }),
             .init(.{ x0, y0, 0.0 }, color, .{ glyph.u0, glyph.v1 }),
+            .init(.{ x1, y0, 0.0 }, color, .{ glyph.u1, glyph.v1 }),
+            .init(.{ x1, y1, 0.0 }, color, .{ glyph.u1, glyph.v0 }),
+            .init(.{ x0, y1, 0.0 }, color, .{ glyph.u0, glyph.v0 }),
         );
+
         cursor_x += glyph.x_advance;
     }
 }

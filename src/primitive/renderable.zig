@@ -1,5 +1,7 @@
 const Image = @import("Image.zig");
 const Font = @import("Font.zig");
+const std = @import("std");
+const App = @import("../App.zig");
 
 pub const Renderable = union(enum) {
     circle: struct {
@@ -17,5 +19,11 @@ pub const Renderable = union(enum) {
     text: struct {
         font: *const Font,
         content: []const u8,
+    },
+    fmt_text: struct {
+        font: *const Font,
+        buf: []u8, // caller-provided buffer, no allocation needed
+        len: usize = 0, // current length of formatted text
+        format_fn: *const fn (buf: []u8, app: *App) []u8,
     },
 };

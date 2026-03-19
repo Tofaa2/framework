@@ -20,22 +20,23 @@ pub const KeyBind = struct {
 };
 
 binds: std.ArrayList(KeyBind),
+allocator: std.mem.Allocator,
 
 pub fn init(allocator: std.mem.Allocator) KeyBinds {
-    return .{ .binds = .init(allocator) };
+    return .{ .binds = .empty, .allocator = allocator };
 }
 
 pub fn bind(self: *KeyBinds, keybind: KeyBind) void {
-    self.binds.append(keybind) catch unreachable;
+    self.binds.append(self.allocator, keybind) catch unreachable;
 }
 
 pub fn update(self: *KeyBinds, app: *runtime.App) void {
-    const win = app.resources.get(window.Window).?;
+    const win = app.resources.getMut(window.Window).?;
     for (self.binds.items) |kb| {
         if (win.isKeyPressed(kb.key)) {
             if (kb.on_press) |f| f(app);
         }
-        if (win.isKeyHeld(kb.key)) {
+        if (win.isKeyDown(kb.key)) {
             if (kb.on_held) |f| f(app);
         }
         if (win.isKeyReleased(kb.key)) {
@@ -45,5 +46,5 @@ pub fn update(self: *KeyBinds, app: *runtime.App) void {
 }
 
 pub fn deinit(self: *KeyBinds) void {
-    self.binds.deinit();
+    self.binds.deinit(self.allocator);
 }

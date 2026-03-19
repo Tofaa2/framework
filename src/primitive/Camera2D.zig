@@ -1,4 +1,4 @@
-const math = @import("math.zig");
+const math = @import("../renderer/math.zig");
 const zm = math;
 const Camera2D = @This();
 

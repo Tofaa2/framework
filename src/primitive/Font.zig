@@ -7,21 +7,24 @@ const Font = @This();
 pub const Glyph = struct {
     // UV coordinates in the atlas texture
     u0: f32,
-    v0: f32, // top-left
+    v0: f32,
     u1: f32,
-    v1: f32, // bottom-right
+    v1: f32,
     // glyph metrics
     width: f32,
     height: f32,
-    x_offset: f32, // offset from cursor to glyph left
-    y_offset: f32, // offset from cursor to glyph top
-    x_advance: f32, // how far to move cursor after this glyph
+    x_offset: f32,
+    y_offset: f32,
+    x_advance: f32,
 };
 
 atlas: Image,
-glyphs: [96]Glyph, // ASCII 32-127 (space to ~)
+glyphs: [96]Glyph,
 font_size: f32,
 atlas_size: u32,
+baseline_offset: f32,
+
+ascent: f32,
 
 pub fn initFile(path: []const u8, font_size: f32, atlas_size: u32) Font {
     const file = std.fs.cwd().openFile(path, .{}) catch |err| {
@@ -34,17 +37,15 @@ pub fn initFile(path: []const u8, font_size: f32, atlas_size: u32) Font {
     defer std.heap.c_allocator.free(buf);
 
     _ = file.readAll(buf) catch unreachable;
-    return Font.init(buf, font_size, atlas_size);
+    return init(buf, font_size, atlas_size);
 }
 
 pub fn init(ttf_data: []const u8, font_size: f32, atlas_size: u32) Font {
-    // allocate bitmap for the atlas
     const bitmap = std.heap.c_allocator.alloc(u8, atlas_size * atlas_size) catch unreachable;
     defer std.heap.c_allocator.free(bitmap);
 
     var char_data: [96]c.stbtt_bakedchar = undefined;
 
-    // bake ASCII 32-127 into the bitmap
     _ = c.stbtt_BakeFontBitmap(
         ttf_data.ptr,
         0, // font offset in file
@@ -57,7 +58,6 @@ pub fn init(ttf_data: []const u8, font_size: f32, atlas_size: u32) Font {
         &char_data,
     );
 
-    // convert single channel bitmap to RGBA for bgfx
     const rgba = std.heap.c_allocator.alloc(u8, atlas_size * atlas_size * 4) catch unreachable;
     defer std.heap.c_allocator.free(rgba);
     for (0..atlas_size * atlas_size) |i| {
@@ -66,17 +66,9 @@ pub fn init(ttf_data: []const u8, font_size: f32, atlas_size: u32) Font {
         rgba[i * 4 + 2] = bitmap[i]; // R
         rgba[i * 4 + 3] = bitmap[i]; // A
     }
-    // for (0..atlas_size * atlas_size) |i| {
-    //     rgba[i * 4 + 0] = 255; // R
-    //     rgba[i * 4 + 1] = 255; // G
-    //     rgba[i * 4 + 2] = 255; // B
-    //     rgba[i * 4 + 3] = bitmap[i]; // A — the actual glyph coverage
-    // }
-    c.stbi_set_flip_vertically_on_load(0); // disable flip for font atlas
-    // const atlas = Image.initOwned(rgba.ptr, atlas_size, atlas_size);
+    c.stbi_set_flip_vertically_on_load(0);
     const atlas = Image.initFontAtlas(rgba.ptr, atlas_size, atlas_size);
-    c.stbi_set_flip_vertically_on_load(1); // re-enable for regular images
-    // convert stbtt_bakedchar to our Glyph format
+    c.stbi_set_flip_vertically_on_load(1);
     var glyphs: [96]Glyph = undefined;
     const atlas_f: f32 = @floatFromInt(atlas_size);
     for (0..96) |i| {
@@ -93,25 +85,21 @@ pub fn init(ttf_data: []const u8, font_size: f32, atlas_size: u32) Font {
             .x_advance = bc.xadvance,
         };
     }
-    _ = c.stbi_write_png(
-        "atlas_debug.png",
-        @intCast(atlas_size),
-        @intCast(atlas_size),
-        1, // single channel
-        bitmap.ptr,
-        @intCast(atlas_size),
-    );
-    std.debug.print("rgba[0..16]: ", .{});
-    for (0..16) |i| {
-        std.debug.print("{d} ", .{rgba[i]});
+    const ref = char_data['H' - 32];
+    const baseline_offset = ref.yoff;
+
+    var min_y_offset: f32 = 0;
+    for (glyphs) |g| {
+        if (g.y_offset < min_y_offset) min_y_offset = g.y_offset;
     }
-    std.debug.print("\n", .{});
 
     return .{
         .atlas = atlas,
         .glyphs = glyphs,
         .font_size = font_size,
         .atlas_size = atlas_size,
+        .baseline_offset = baseline_offset,
+        .ascent = -min_y_offset,
     };
 }
 

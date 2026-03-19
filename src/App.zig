@@ -22,8 +22,8 @@ allocators: Allocators,
 scheduler: Scheduler,
 world: ecs.Registry,
 running: bool,
-window: root.platform.Window,
-renderer: root.renderer.Renderer,
+// window: root.platform.Window,
+// renderer: root.renderer.Renderer,
 
 pub const AppConfig = struct {
     name: []const u8 = "framework-app",
@@ -43,17 +43,17 @@ pub fn init(config: AppConfig) Self {
         .scheduler = Scheduler.init(
             .{ .allocator = config.allocators.generic },
         ) catch unreachable,
-        .window = root.platform.Window.init(config.name, config.width, config.height),
-        .renderer = undefined,
     };
-    app.renderer = root.renderer.Renderer.init(
+    app.resources.add(Time{}) catch unreachable;
+    app.resources.add(root.platform.Window.init(config.name, config.width, config.height)) catch unreachable;
+    app.resources.add(root.renderer.Renderer.init(
         config.allocators.generic,
         .{ .width = config.width, .height = config.height },
-        app.window.getNativePtr(),
+        app.resources.getMut(root.platform.Window).?.getNativePtr(),
         config.debug,
-    ) catch unreachable;
-    app.resources.add(Time{}) catch unreachable;
+    ) catch unreachable) catch unreachable;
 
+    app.resources.add(root.primitive.FpsCounter{}) catch unreachable;
     return app;
 }
 
@@ -76,23 +76,35 @@ pub fn run(self: *Self) void {
 
     while (self.running) {
         self.updateTime();
-        self.window.update();
-        if (self.window.resized_last_frame) {
-            self.renderer.resize(self.window.width, self.window.height);
+        if (self.resources.getMut(root.platform.Window)) |wind| {
+            wind.update();
+            if (wind.resized_last_frame) {
+                const r_ptr = self.resources.getMut(root.renderer.Renderer);
+                if (r_ptr) |renderer| {
+                    renderer.resize(wind.width, wind.height);
+                }
+            }
+            self.running = !wind.shouldClose();
         }
-        self.running = !self.window.shouldClose();
         self.scheduler.run(self, .update);
         self.scheduler.run(self, .render);
-        self.renderPrimitive();
-        self.renderer.draw();
+
+        const r_ptr = self.resources.getMut(root.renderer.Renderer);
+        if (r_ptr) |renderer| {
+            self.renderPrimitive(r_ptr.?);
+            renderer.draw();
+        }
+
+        self.updateFps();
+        self.enforceFpsLimit();
+        _ = self.allocators.frame_arena.reset(.retain_capacity);
     }
 }
 
-fn renderPrimitive(self: *Self) void {
+fn renderPrimitive(self: *Self, renderer: *root.renderer.Renderer) void {
     var query = self.world.view(.{ root.primitive.Transform, root.primitive.Renderable }, .{});
     var iter = query.entityIterator();
 
-    // var batch_3d = self.renderer.getView(.@"3d").?.createBatch();
     while (iter.next()) |entity| {
         const transform = query.getConst(root.primitive.Transform, entity);
         const renderable = query.getConst(root.primitive.Renderable, entity);
@@ -106,7 +118,7 @@ fn renderPrimitive(self: *Self) void {
             .circle => |circle| {
                 const segments: u32 = circle.segments orelse 16;
 
-                var batch_2d = self.renderer.getView(.@"2d").?.createBatch();
+                var batch_2d = renderer.getView(.@"2d").?.createBatch();
                 batch_2d.pushCircle(
                     transform.center[0],
                     transform.center[1],
@@ -116,13 +128,13 @@ fn renderPrimitive(self: *Self) void {
                 );
             },
             .rect => |rect| {
-                var batch_2d = self.renderer.getView(.@"2d").?.createBatch();
+                var batch_2d = renderer.getView(.@"2d").?.createBatch();
                 batch_2d.pushRect(transform.center[0], transform.center[1], rect.width, rect.height, tint);
             },
             .sprite => |sprite| {
                 const w = @as(f32, @floatFromInt(sprite.image.width));
                 const h = @as(f32, @floatFromInt(sprite.image.height));
-                var sprite_batch = self.renderer.getView(.@"2d").?.createBatch();
+                var sprite_batch = renderer.getView(.@"2d").?.createBatch();
                 sprite_batch.texture = sprite.image;
                 sprite_batch.pushTexturedRect(
                     transform.center[0] - w * 0.5,
@@ -133,7 +145,7 @@ fn renderPrimitive(self: *Self) void {
                 );
             },
             .text => |t| {
-                var text_batch = self.renderer.getView(.@"2d").?.createBatch();
+                var text_batch = renderer.getView(.@"2d").?.createBatch();
                 text_batch.texture = &t.font.atlas;
                 text_batch.pushText(
                     t.font,
@@ -143,20 +155,44 @@ fn renderPrimitive(self: *Self) void {
                     tint,
                 );
             },
+            .fmt_text => |*t| {
+                const text = t.format_fn(t.buf, self);
+                var text_batch = renderer.getView(.@"2d").?.createBatch();
+                text_batch.texture = &t.font.atlas;
+                text_batch.pushText(t.font, text, transform.center[0], transform.center[1], tint);
+            },
             // else => {
             //     @panic("Not implemented yet!");
             // },
         }
     }
 }
-
+fn updateFps(app: *Self) void {
+    const time = app.resources.get(Time).?;
+    app.resources.getMut(root.primitive.FpsCounter).?.update(@floatCast(time.delta));
+}
 fn updateTime(self: *Self) void {
     var time = self.resources.getMut(Time);
     time.?.update(std.time.nanoTimestamp());
+}
+
+fn enforceFpsLimit(app: *Self) void {
+    const time = app.resources.getMut(Time) orelse return;
+    const limit = time.fps_limit orelse return;
+
+    const target_ns: u64 = @intFromFloat(1_000_000_000.0 / @as(f64, @floatFromInt(limit)));
+    const now: u64 = @intCast(std.time.nanoTimestamp());
+    const frame_start: u64 = @intCast(time.last_frame);
+    const elapsed = now - frame_start;
+
+    if (elapsed < target_ns) {
+        std.Thread.sleep(target_ns - elapsed);
+    }
 }
 
 pub const Allocators = struct {
     world: Allocator,
     generic: Allocator,
     frame: Allocator,
+    frame_arena: std.heap.ArenaAllocator,
 };

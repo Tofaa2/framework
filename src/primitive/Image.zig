@@ -57,29 +57,6 @@ pub fn initRef(data: ?*const anyopaque, width: u32, height: u32) Image {
     };
 }
 pub fn initFontAtlas(data: ?*const anyopaque, width: u32, height: u32) Image {
-    // _ = data;
-    // // temp: make a checkerboard to verify texture upload works
-    // const test_size = width * height * 4;
-    // const test_data = std.heap.c_allocator.alloc(u8, test_size) catch unreachable;
-    // defer std.heap.c_allocator.free(test_data);
-    // for (0..width * height) |i| {
-    //     const checker = if ((i % 2) == 0) @as(u8, 255) else @as(u8, 0);
-    //     test_data[i * 4 + 0] = checker; // R
-    //     test_data[i * 4 + 1] = 0; // G
-    //     test_data[i * 4 + 2] = checker; // B
-    //     test_data[i * 4 + 3] = 255; // A
-    // }
-    // const handle = bgfx.createTexture2D(
-    //     @intCast(width),
-    //     @intCast(height),
-    //     false,
-    //     1,
-    //     .RGBA8,
-    //     bgfx.SamplerFlags_UClamp | bgfx.SamplerFlags_VClamp,
-    //     bgfx.copy(test_data.ptr, @intCast(test_size)),
-    //     0,
-    // );
-    // return .{ .handle = handle, .width = width, .height = height };
     const handle = bgfx.createTexture2D(
         @intCast(width),
         @intCast(height),
@@ -104,10 +81,6 @@ pub fn initFile(
     var height: u32 = 0;
     c.stbi_set_flip_vertically_on_load(1);
     const data = c.stbi_load(@ptrCast(path.ptr), @ptrCast(&width), @ptrCast(&height), null, c.STBI_rgb_alpha);
-    std.debug.print("width: {d}, height: {d}, data: {*}\n", .{ width, height, data });
-    if (data == null) {
-        std.debug.panic("Failed to load image: {s}\n", .{path});
-    }
 
     defer c.stbi_image_free(data);
 
@@ -119,7 +92,6 @@ pub fn initFile(
         .RGBA8,
         bgfx.SamplerFlags_Point | bgfx.SamplerFlags_UvwClamp,
         bgfx.copy(@ptrCast(data), @intCast(width * height * 4)),
-        // bgfx.copy(data, @intCast(width * height * 4)),
         0,
     );
     return .{
