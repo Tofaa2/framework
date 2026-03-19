@@ -1,10 +1,7 @@
-// pub const native = @import("native.zig");
 const std = @import("std");
 const builtin = @import("builtin");
 
-pub const c = @cImport({
-    @cInclude("RGFW.h");
-});
+pub const c = @import("thirdparty").rgfw;
 
 pub const ResizeCallback = *const fn (*Window, u32, u32) void;
 pub const ResizeCallbacks = std.ArrayListUnmanaged(ResizeCallback);
@@ -21,7 +18,7 @@ pub const Window = struct {
     height: u32,
     data: []usize, // TODO: Probably ArrayList is better
     callbacks: Callbacks = .{},
-
+    resized_last_frame: bool = false,
     pub fn getFrameBufferSize(self: *Window) [2]i32 {
         var width: i32 = undefined;
         var height: i32 = undefined;
@@ -113,6 +110,9 @@ pub const Window = struct {
     }
 
     pub fn update(self: *Window) void {
+        const old_width = self.width;
+        const old_height = self.height;
+
         var event: c.RGFW_event = undefined;
         while (c.RGFW_window_checkEvent(self.handle, &event) == 1) {
             if (event.type == 17) {
@@ -120,7 +120,17 @@ pub const Window = struct {
                 break;
             }
         }
+        var new_w: i32 = undefined;
+        var new_h: i32 = undefined;
+        _ = c.RGFW_window_getSize(self.handle, &new_w, &new_h);
+        self.width = @intCast(new_w);
+        self.height = @intCast(new_h);
         c.RGFW_pollEvents();
+        if (old_width != self.width or old_height != self.height) {
+            self.resized_last_frame = true;
+        } else {
+            self.resized_last_frame = false;
+        }
     }
 
     pub fn setFlagsRaw(self: *Window, flags: u32) void {

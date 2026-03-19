@@ -2,7 +2,8 @@ const Self = @This();
 const std = @import("std");
 const math = @import("math.zig");
 const Batch = @import("RenderBatch.zig");
-const Color = @import("Color.zig");
+const Color = @import("../primitive/Color.zig");
+const bgfx = @import("bgfx").bgfx;
 
 pub const Map = std.AutoArrayHashMap(Id, Self);
 
@@ -17,7 +18,8 @@ id: Id,
 proj_mtx: math.Mat = math.identity(),
 view_mtx: math.Mat = math.identity(),
 model_mtx: math.Mat = math.identity(),
-clear_color: Color = .white,
+clear_color: Color = .black,
+clear_flags: u16 = bgfx.ClearFlags_Color | bgfx.ClearFlags_Depth,
 
 batches: std.ArrayList(Batch) = .empty,
 allocator: std.mem.Allocator,

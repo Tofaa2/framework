@@ -28,7 +28,7 @@ pub fn toABGR(self: Color) u32 {
 }
 
 pub fn toRGBA(self: Color) u32 {
-    return @as(u32, self.a) << 24 | @as(u32, self.r) << 16 | @as(u32, self.g) << 8 | @as(u32, self.b);
+    return @as(u32, self.r) << 24 | @as(u32, self.g) << 16 | @as(u32, self.b) << 8 | @as(u32, self.a);
 }
 
 pub fn fromRGBA(rgba: u32) Color {

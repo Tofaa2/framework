@@ -11,6 +11,23 @@ pub fn build(b: *Build) !void {
     const target = b.standardTargetOptions(.{});
     const optimize = b.standardOptimizeOption(.{ .preferred_optimize_mode = .Debug });
 
+    const thirdparty = b.addLibrary(.{ .name = "framework-thirdparty", .root_module = b.createModule(.{
+        .link_libc = true,
+        .root_source_file = b.path("thirdparty/root.zig"),
+        .optimize = optimize,
+        .target = target,
+    }) });
+    thirdparty.addIncludePath(b.path("thirdparty/"));
+    thirdparty.addCSourceFiles(.{
+        .files = &.{ "RGFW_Impl.c", "stb_truetype_impl.c" },
+        .root = b.path("thirdparty/"),
+    });
+    switch (target.result.os.tag) {
+        .windows => {
+            thirdparty.root_module.linkSystemLibrary("gdi32", .{ .needed = true });
+        },
+        else => {},
+    }
     const runtime = b.addModule("runtime", .{
         .link_libc = true,
         .link_libcpp = true,
@@ -18,24 +35,34 @@ pub fn build(b: *Build) !void {
         .target = target,
         .root_source_file = b.path("src/root.zig"),
     });
+    runtime.addImport("thirdparty", thirdparty.root_module);
+    runtime.linkLibrary(thirdparty);
     linkSimpleModDep(b, runtime, "entt", "ecs", "zig-ecs");
-    runtime.addIncludePath(b.path("thirdparty/"));
-    runtime.addCSourceFiles(.{
-        .files = &.{"RGFW_Impl.c"},
-        .root = b.path("thirdparty/"),
+    try linkBgfx(b, target, optimize, runtime);
+    const sandbox = buildSandbox(b, target, optimize, &.{.{ .name = "runtime", .module = runtime }});
+
+    const mod_tests = b.addTest(.{
+        .root_module = runtime,
     });
+    const run_mod_tests = b.addRunArtifact(mod_tests);
+    const exe_tests = b.addTest(.{
+        .root_module = sandbox.root_module,
+    });
+    const run_exe_tests = b.addRunArtifact(exe_tests);
+    const test_step = b.step("test", "Run tests");
+    test_step.dependOn(&run_mod_tests.step);
+    test_step.dependOn(&run_exe_tests.step);
 
-    switch (target.result.os.tag) {
-        .windows => {
-            runtime.linkSystemLibrary("gdi32", .{ .needed = true });
-        },
-        else => {},
-    }
+    mod_tests.root_module.addCMacro("__INTMAX_C_SUFFIX__", "");
+    mod_tests.root_module.addCMacro("__UINTMAX_C_SUFFIX", "");
+    mod_tests.root_module.addCMacro("__INT64_C_SUFFIX__", "");
 
-    buildSandbox(b, target, optimize, &.{.{ .name = "runtime", .module = runtime }});
+    exe_tests.root_module.addCMacro("__INTMAX_C_SUFFIX__", "");
+    exe_tests.root_module.addCMacro("__UINTMAX_C_SUFFIX__", "");
+    exe_tests.root_module.addCMacro("__INT64_C_SUFFIX__", "");
 }
 
-fn buildSandbox(b: *Build, target: Target, optimize: Optimize, imports: Imports) void {
+fn buildSandbox(b: *Build, target: Target, optimize: Optimize, imports: Imports) *Build.Step.Compile {
     const exe = b.addExecutable(.{
         .name = "sandbox",
         .root_module = b.createModule(.{
@@ -54,6 +81,7 @@ fn buildSandbox(b: *Build, target: Target, optimize: Optimize, imports: Imports)
     }
     const run_step = b.step("run", "Run the app");
     run_step.dependOn(&run_cmd.step);
+    return exe;
 }
 
 fn linkSimpleModDep(b: *std.Build, module: *std.Build.Module, dep_name: []const u8, name: []const u8, mod_name: []const u8) void {

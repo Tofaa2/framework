@@ -1,6 +1,6 @@
 const math = @import("math");
 const Self = @This();
-const Color = @import("Color.zig");
+const Color = @import("../primitive/Color.zig");
 position: [3]f32,
 color: u32,
 tex_coords: [2]f32,
