@@ -117,17 +117,23 @@ pub fn pushText(self: *MeshBuilder, font: *const Font, text: []const u8, x: f32,
     for (text) |char| {
         const glyph = font.getGlyph(char) orelse continue;
         const x0 = cursor_x + glyph.x_offset;
-        const y0 = y + glyph.y_offset;
         const x1 = x0 + glyph.width;
+        // const y0 = y - (glyph.y_offset + font.ascent);
+        // const y1 = y0 - glyph.height; // subtract instead of add
+        // self.pushQuad(
+        //     .init(.{ x0, y0, 0.0 }, color, .{ glyph.u0, glyph.v0 }),
+        //     .init(.{ x1, y0, 0.0 }, color, .{ glyph.u1, glyph.v0 }),
+        //     .init(.{ x1, y1, 0.0 }, color, .{ glyph.u1, glyph.v1 }),
+        //     .init(.{ x0, y1, 0.0 }, color, .{ glyph.u0, glyph.v1 }),
+        // );
+        const y0 = y + glyph.y_offset + font.ascent;
         const y1 = y0 + glyph.height;
-
         self.pushQuad(
-            .init(.{ x0, y0, 0.0 }, color, .{ glyph.u0, glyph.v1 }),
-            .init(.{ x1, y0, 0.0 }, color, .{ glyph.u1, glyph.v1 }),
-            .init(.{ x1, y1, 0.0 }, color, .{ glyph.u1, glyph.v0 }),
-            .init(.{ x0, y1, 0.0 }, color, .{ glyph.u0, glyph.v0 }),
+            .init(.{ x0, y0, 0.0 }, color, .{ glyph.u0, glyph.v0 }),
+            .init(.{ x1, y0, 0.0 }, color, .{ glyph.u1, glyph.v0 }),
+            .init(.{ x1, y1, 0.0 }, color, .{ glyph.u1, glyph.v1 }),
+            .init(.{ x0, y1, 0.0 }, color, .{ glyph.u0, glyph.v1 }),
         );
-
         cursor_x += glyph.x_advance;
     }
 }
@@ -201,16 +207,5 @@ pub fn submitTransient(self: *MeshBuilder, view: *View, shader: ?ShaderProgram, 
         .texture = texture,
         .transform = transform,
         .blend = blend,
-    }) catch unreachable;
-}
-
-pub fn submitTransient0(self: *MeshBuilder, view: *View, shader: ?ShaderProgram, texture: ?*const Image, transform: ?math.Mat) void {
-    if (self.vertices.items.len == 0) return;
-    view.transient_submissions.append(self.allocator, .{
-        .vertices = self.allocator.dupe(Vertex, self.vertices.items) catch unreachable,
-        .indices = self.allocator.dupe(u16, self.indices.items) catch unreachable,
-        .shader = shader,
-        .texture = texture,
-        .transform = transform,
     }) catch unreachable;
 }

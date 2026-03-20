@@ -50,7 +50,6 @@ pub const UIContext = struct {
     }
 
     pub fn end(self: *UIContext) void {
-        std.debug.print("geo vertices: {d} text vertices: {d}\n", .{ self.geo.vertices.items.len, self.text.vertices.items.len });
         self.geo.submitTransient(self.view, null, null, null, false);
         self.text.submitTransient(self.view, null, &self.font.atlas, null, true);
     }

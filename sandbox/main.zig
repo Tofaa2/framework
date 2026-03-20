@@ -21,82 +21,6 @@ pub fn main() !void {
     });
     defer application.deinit();
 
-    var font = runtime.primitive.Font.initFile("assets/Roboto-Regular.ttf", 32, 512);
-    defer font.deinit();
-
-    var renderer = application.resources.getMut(runtime.renderer.Renderer).?;
-
-    const fps_label = application.world.create();
-    var fps_buf: [64]u8 = undefined;
-    application.world.add(fps_label, runtime.primitive.Transform{
-        .center = .{
-            540.0,
-            10.0,
-            0.0,
-        },
-    });
-    application.world.add(fps_label, runtime.primitive.Renderable{ .fmt_text = .{
-        .font = &font,
-        .buf = &fps_buf,
-        .format_fn = struct {
-            fn f(buf: []u8, app: *runtime.App) []u8 {
-                const fps = app.resources.get(runtime.primitive.FpsCounter).?.fps;
-                return std.fmt.bufPrint(buf, "FPS: {d:.0}", .{fps}) catch buf[0..0];
-            }
-        }.f,
-    } });
-
-    try application.resources.add(runtime.ui.UIContext.init(allocator, &font, renderer.getView(.ui).?));
-    try application.scheduler.addStage(.{
-        .name = "draw-ui",
-        .priority = 90,
-        .phase = .render,
-        .run = drawUi,
-    });
-
-    application.run();
-}
-
-fn drawUi(app: *runtime.App) void {
-    var ui = app.resources.getMut(runtime.ui.UIContext).?;
-    const window = app.resources.getMut(runtime.platform.Window).?;
-    const renderer = app.resources.getMut(runtime.renderer.Renderer).?;
-
-    // refresh view pointer each frame
-    ui.view = renderer.getView(.@"2d").?;
-
-    ui.begin(window);
-    ui.rect(0, 0, 200, 600, .{ .r = 30, .g = 30, .b = 30, .a = 220 });
-    if (ui.button("Save", 8, 8, 184, 32)) {
-        std.debug.print("Save clicked!\n", .{});
-    }
-    if (ui.button("Load", 8, 48, 184, 32)) {
-        std.debug.print("Load clicked!\n", .{});
-    }
-    ui.label("Hello World", 8, 100, .white);
-    ui.end();
-}
-
-pub fn main0() !void {
-    var gpa = std.heap.GeneralPurposeAllocator(.{}){};
-    // defer _ = gpa.deinit();
-    const allocator = gpa.allocator();
-
-    var arena = std.heap.ArenaAllocator.init(std.heap.page_allocator);
-    defer arena.deinit();
-    const arena_allocator = arena.allocator();
-
-    var application = runtime.App.init(.{
-        .name = "sandbox",
-        .allocators = .{
-            .frame = arena_allocator,
-            .generic = allocator,
-            .world = allocator,
-            .frame_arena = arena,
-        },
-    });
-    defer application.deinit();
-
     const shinoa = runtime.primitive.Image.initFile("assets/shinoa.png");
     defer shinoa.deinit();
 
@@ -213,7 +137,7 @@ pub fn main0() !void {
                 const fps = app.resources.get(runtime.primitive.FpsCounter).?.fps;
                 return std.fmt.bufPrint(buf, "FPS: {d:.0}", .{fps}) catch buf[0..0];
             }
-        }.f,
+        }.f,            
     } });
 
     application.resources.getMut(runtime.primitive.Time).?.fps_limit = 165;
@@ -238,7 +162,7 @@ pub fn main0() !void {
         .rotation = .{ 0.5, -0.8, 0.3 },
     });
     application.world.add(sun, runtime.primitive.Light{
-        .color = .red,
+        .color = .white,
         .intensity = 12.0, // was 1.0
     });
 

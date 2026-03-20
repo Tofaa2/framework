@@ -49,13 +49,15 @@ pub const Renderer = struct {
         allocator: std.mem.Allocator,
         viewport: Viewport,
         window_ptr: ?*anyopaque,
+        display_ptr: ?*anyopaque,
         debug: bool,
     ) !Renderer {
         var bgfx_init = std.mem.zeroes(bgfx.Init);
         bgfx.initCtor(&bgfx_init);
 
         bgfx_init.platformData.nwh = window_ptr;
-        bgfx_init.type = .Vulkan;
+        bgfx_init.platformData.ndt = display_ptr;
+        bgfx_init.type = .Count;
         bgfx_init.resolution.width = viewport.width;
         bgfx_init.resolution.height = viewport.height;
         bgfx_init.debug = debug;
@@ -91,12 +93,25 @@ pub const Renderer = struct {
         _ = layout.add(.Normal, 3, .Float, false, false);
         layout.end();
         var views = View.Map.init(allocator);
+
         views.put(.@"2d", .{
-            .proj_mtx = math.orthographicOffCenterRhGl(0.0, @floatFromInt(viewport.width), @floatFromInt(viewport.height), 0.0, -1.0, 1.0),
+            .proj_mtx = math.orthographicOffCenterRhGl(
+                0.0,
+                @floatFromInt(viewport.width),
+                0.0,
+                @floatFromInt(viewport.height),
+                -1.0,
+                1.0,
+            ),
             .id = .@"2d",
             .allocator = allocator,
         }) catch unreachable;
-        bgfx.setDebug(bgfx.DebugFlags_Stats);
+        // views.put(.@"2d", .{
+        //     .proj_mtx = math.orthographicOffCenterRhGl(0.0, @floatFromInt(viewport.width), @floatFromInt(viewport.height), 0.0, -1.0, 1.0),
+        //     .id = .@"2d",
+        //     .allocator = allocator,
+        // }) catch unreachable;
+        // bgfx.setDebug(bgfx.DebugFlags_Stats);
 
         views.put(.@"3d", .{
             .clear_flags = bgfx.ClearFlags_Depth,
@@ -127,6 +142,7 @@ pub const Renderer = struct {
             .id = .ui,
             .allocator = allocator,
         }) catch unreachable;
+
         return Renderer{
             .allocator = allocator,
             .viewport = viewport,
@@ -144,17 +160,26 @@ pub const Renderer = struct {
         self.viewport.height = height;
 
         bgfx.reset(width, height, bgfx.ResetFlags_None, bgfx.TextureFormat.Count);
-
         if (self.views.getPtr(.@"2d")) |v| {
             v.proj_mtx = math.orthographicOffCenterRhGl(
                 0.0,
                 @floatFromInt(width),
-                @floatFromInt(height),
                 0.0,
+                @floatFromInt(height),
                 -1.0,
                 1.0,
             );
         }
+        // if (self.views.getPtr(.@"2d")) |v| {
+        //     v.proj_mtx = math.orthographicOffCenterRhGl(
+        //         0.0,
+        //         @floatFromInt(width),
+        //         @floatFromInt(height),
+        //         0.0,
+        //         -1.0,
+        //         1.0,
+        //     );
+        // }
         if (self.views.getPtr(.@"3d")) |v| {
             v.proj_mtx = zm.perspectiveFovRhGl(
                 0.25 * std.math.pi,
@@ -253,12 +278,31 @@ pub const Renderer = struct {
             if (sub.transform) |t| {
                 _ = bgfx.setTransform(&math.matToArr(zm.transpose(t)), 1);
             }
-            if (sub.blend) {
-                self.setState(sub.texture, true);
-                // bgfx.setState(0x400005600f, 0); // with WriteZ
+            const state = bgfx.StateFlags_WriteRgb |
+                bgfx.StateFlags_WriteA |
+                bgfx.StateFlags_WriteZ |
+                bgfx.StateFlags_DepthTestLess;
+            bgfx.setState(state, 0);
+            if (sub.texture) |tex| {
+                bgfx.setTexture(0, self.tex_uniform, tex.handle, std.math.maxInt(u32));
             } else {
-                self.setState(sub.texture, false);
+                bgfx.setTexture(0, self.tex_uniform, self.white_texture.handle, std.math.maxInt(u32));
             }
+            // if (sub.blend) {
+            //     const state = bgfx.StateFlags_WriteRgb |
+            //         bgfx.StateFlags_WriteA |
+            //         bgfx.StateFlags_BlendAlphaToCoverage;
+            //     bgfx.setState(state, 0);
+            // } else {
+            //     self.setState(sub.texture, false);
+            // }
+            // if (sub.blend) {
+            //         bgfx.setState(0x00000040000650ff, 0); // WriteRgb + WriteA + WriteZ + DepthTestLess + blend
+            //
+            //     // self.setState(sub.texture, true);
+            // } else {
+            //     self.setState(sub.texture, false);
+            // }
             var tvb: bgfx.TransientVertexBuffer = undefined;
             var tib: bgfx.TransientIndexBuffer = undefined;
             if (!bgfx.allocTransientBuffers(&tvb, &self.vertex_layout, @intCast(sub.vertices.len), &tib, @intCast(sub.indices.len), false)) {
@@ -269,7 +313,6 @@ pub const Renderer = struct {
             @memcpy(tib.data[0..(sub.indices.len * 2)], std.mem.sliceAsBytes(sub.indices));
             bgfx.setTransientVertexBuffer(0, &tvb, 0, @intCast(sub.vertices.len));
             bgfx.setTransientIndexBuffer(&tib, 0, @intCast(sub.indices.len));
-
             _ = bgfx.submit(view_id, self.unlit_program.program_handle, 0, bgfx.DiscardFlags_All);
         }
 
@@ -282,12 +325,17 @@ pub const Renderer = struct {
         view.dynamic_meshes.clearRetainingCapacity();
         view.transient_submissions.clearRetainingCapacity();
     }
+
     fn setState(self: *Renderer, texture: ?*const Image, blend: bool) void {
-        _ = blend;
-        const state = bgfx.StateFlags_WriteRgb |
-            bgfx.StateFlags_WriteA |
-            bgfx.StateFlags_WriteZ |
-            bgfx.StateFlags_DepthTestLess;
+        var state = bgfx.StateFlags_WriteRgb | bgfx.StateFlags_WriteA;
+
+        if (!blend) {
+            state |= bgfx.StateFlags_WriteZ | bgfx.StateFlags_DepthTestLess;
+        } else {
+            // No depth test/write for blended UI
+            state |= stateBlendFunc(bgfx.StateFlags_BlendSrcAlpha, bgfx.StateFlags_BlendInvSrcAlpha);
+        }
+
         bgfx.setState(state, 0);
         if (texture) |tex| {
             bgfx.setTexture(0, self.tex_uniform, tex.handle, std.math.maxInt(u32));
@@ -295,18 +343,6 @@ pub const Renderer = struct {
             bgfx.setTexture(0, self.tex_uniform, self.white_texture.handle, std.math.maxInt(u32));
         }
     }
-    // fn setState(self: *Renderer, texture: ?*const Image) void {
-    //     const state = bgfx.StateFlags_WriteRgb |
-    //         bgfx.StateFlags_WriteA |
-    //         bgfx.StateFlags_WriteZ |
-    //         bgfx.StateFlags_DepthTestLess;
-    //     bgfx.setState(state, 0);
-    //     if (texture) |tex| {
-    //         bgfx.setTexture(0, self.tex_uniform, tex.handle, std.math.maxInt(u32));
-    //     } else {
-    //         bgfx.setTexture(0, self.tex_uniform, self.white_texture.handle, std.math.maxInt(u32));
-    //     }
-    // }
 
     pub fn deinit(self: *Renderer) void {
         self.unlit_program.deinit();

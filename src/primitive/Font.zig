@@ -111,3 +111,14 @@ pub fn getGlyph(self: *const Font, char: u8) ?*const Glyph {
 pub fn deinit(self: *Font) void {
     self.atlas.deinit();
 }
+
+pub fn measureText(self: *const Font, text: []const u8) [2]f32 {
+    var width: f32 = 0;
+    var height: f32 = 0;
+    for (text) |char| {
+        const glyph = self.getGlyph(char) orelse continue;
+        width += glyph.x_advance;
+        height = @max(height, glyph.height);
+    }
+    return .{ width, height };
+}

@@ -26,6 +26,10 @@ pub fn build(b: *Build) !void {
         .windows => {
             thirdparty.root_module.linkSystemLibrary("gdi32", .{ .needed = true });
         },
+        .linux => {
+            thirdparty.root_module.linkSystemLibrary("X11", .{ .needed = true });
+            thirdparty.root_module.linkSystemLibrary("xrandr", .{ .needed = true });
+        },
         else => {},
     }
     const runtime = b.addModule("runtime", .{
@@ -52,6 +56,39 @@ pub fn build(b: *Build) !void {
     const test_step = b.step("test", "Run tests");
     test_step.dependOn(&run_mod_tests.step);
     test_step.dependOn(&run_exe_tests.step);
+
+    setupExamples(b, target, optimize, &.{.{ .name = "runtime", .module = runtime }});
+}
+
+fn setupExamples(b: *std.Build, target: Target, optimize: Optimize, imports: Imports) void {
+    const Example = struct {
+        name: []const u8,
+        path: []const u8,
+    };
+
+    const names: []const Example = &.{
+        .{ .name = "snake", .path = "examples/snake.zig" },
+    };
+
+    for (names) |example| {
+        const exe = b.addExecutable(.{
+            .name = example.name,
+            .root_module = b.createModule(.{
+                .target = target,
+                .optimize = optimize,
+                .imports = imports,
+                .root_source_file = b.path(example.path),
+            }),
+        });
+        b.installArtifact(exe);
+        const run_cmd = b.addRunArtifact(exe);
+        run_cmd.step.dependOn(b.getInstallStep());
+        if (b.args) |args| {
+            run_cmd.addArgs(args);
+        }
+        const run_step = b.step(example.name, "Run an example");
+        run_step.dependOn(&run_cmd.step);
+    }
 }
 
 fn buildSandbox(b: *Build, target: Target, optimize: Optimize, imports: Imports) *Build.Step.Compile {

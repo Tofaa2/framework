@@ -1,25 +1,194 @@
-# Framework an opinionated minimal game/app engine/framework.
+# Framework
+ 
+An opinionated, minimal game and application engine written in Zig.
+ 
+## Philosophy
+ 
+Framework is extremely bare-bones by design. The core principle is **everything is a resource** — from the window and renderer, to time and FPS counters. This gives you maximum flexibility and control over your application at the cost of verbosity.
+ 
+Something that takes a few button clicks in Unity might take 100 lines of code in Framework — and that's intentional. The goal isn't to minimize lines written, it's to give you full control over what happens and when. Down the line a scene editor will make common workflows less painful, but the low-level approach remains the foundation.
+ 
+Primitives and components used across the codebase live in `src/primitive`. That's where you'll spend most of your time.
+ 
+## Getting Started
+ 
+```bash
+git clone https://github.com/Tofaa2/framework
+cd framework
+zig build
+```
+ 
+A fully playable snake game built with the engine lives in `examples/snake`:
+ 
+```bash
+zig build snake
+```
+ 
+## Basic Usage
+ 
+```zig
+const runtime = @import("framework-runtime");
+const std = @import("std");
+ 
+pub fn main() !void {
+    var gpa = std.heap.GeneralPurposeAllocator(.{}){};
+    const allocator = gpa.allocator();
+    var arena = std.heap.ArenaAllocator.init(std.heap.page_allocator);
+    defer arena.deinit();
+ 
+    var app = runtime.App.init(.{
+        .name = "my_app",
+        .allocators = .{
+            .frame = arena.allocator(),
+            .generic = allocator,
+            .world = allocator,
+            .frame_arena = arena,
+        },
+    });
+    defer app.deinit();
+ 
+    // spawn a red circle at 400, 300
+    const circle = app.world.create();
+    app.world.add(circle, runtime.primitive.Transform{
+        .center = .{ 400.0, 300.0, 0.0 },
+    });
+    app.world.add(circle, runtime.primitive.Renderable{
+        .circle = .{ .radius = 50 },
+    });
+    app.world.add(circle, runtime.primitive.Color.red);
+ 
+    // add an update system
+    try app.scheduler.addStage(.{
+        .name = "my-system",
+        .phase = .update,
+        .run = mySystem,
+    });
+ 
+    app.run();
+}
+ 
+fn mySystem(app: *runtime.App) void {
+    var query = app.world.view(.{ runtime.primitive.Transform, runtime.primitive.Renderable }, .{});
+    var iter = query.entityIterator();
+    while (iter.next()) |entity| {
+        const transform = query.get(runtime.primitive.Transform, entity);
+        transform.center[0] += 1.0;
+    }
+}
+```
 
-A simple runnable example can be found in `sandbox` and can be ran from the repo by using `zig build run`
-Font rendering is still hella scuffed idk how to fix that
-The main principle for this engine is everything is a resource. From basic stuff like the window, renderer, to time, fps. Primitives used across the codebase can be found in `src/primitive`. Thats what you will interact with most of the time.
-Framework is extremely bare-bones, the design philosophy is maximum flexibility, I intend to keed it that way, stuff in unity might take a few buttons but a 100 lines of code in framework but my goal isnt minimizing the lines of code the end user writes. I intend on having a scene editor down the line to define prefabs, edit world geometry and whatever runs oninit, etc but thats a thought for down the line, I think even with this lowlevel approach once i have enough utilities and baked in features available there wont be a need for working directly with scenes besides prefab QOL.
 
+# Engine TODO
 
-## TODO:
-- [x] Restructure renderbatch and views to support proper optimizations for each type of renderable, at the moment we use transient buffers which is only good for per-frame geometry like text
-- [x] Basic MTL parser
-- [x] Normals 
-- [ ] Fix memory leaks (im lazy, most of them are shutdown logic)
-- [x] Improve camera system
-- [ ] Introduce more primitives and renderables
-- [ ] UI
+## Renderer
+- [x] Restructure renderbatch and views to support proper optimizations for each type of renderable
+- [x] Transient buffer support for per-frame geometry
 - [x] Static mesh rendering
-- [ ] Basic Physics
-- [ ] Materials, lighting, render passes ( right now only directional light exists )
-- [ ] Introduce a better pipeline and more views, atm we only have @"2d" for 2d rendering and @"3d" for 3d rendering
-- [ ] Let user take cli arguments easily, allowing for cli args for renderer type etc.
-- [ ] Prefab system for creating "default" entities
-- [ ] Switch to our own in-house ecs
-- [ ] Scene editor and a basic scripting API in a seperate module and executable.
-- [ ] Backface culling and other optimizations
+- [x] Dynamic mesh rendering
+- [x] Material system (unlit + diffuse)
+- [x] Directional lighting with Lambert diffuse
+- [x] Multiple directional lights (up to 4)
+- [x] Normals in vertex format
+- [x] OBJ loading with MTL parser
+- [x] Texture support for meshes (map_Kd)
+- [x] Font rendering and text
+- [x] 2D primitives (circle, rect, line, quad, triangle)
+- [x] Anchor system for resolution-independent positioning
+- [x] Separate 2D and 3D views with correct coordinate systems
+- [ ] Point lights and spot lights
+- [ ] Shadow mapping
+- [ ] Skybox / environment map
+- [ ] Render passes and framebuffers
+- [ ] Post-processing effects (bloom, blur, tonemapping)
+- [ ] Sprite sheets and UV sub-regions
+- [ ] Particle system
+- [ ] Backface culling and other draw call optimizations
+- [ ] Batch merging for same-texture 2D sprites
+- [ ] Better pipeline with more configurable views
+- [ ] GLTF model loading (required for animations)
+- [ ] Skeletal animation
+
+## UI
+- [x] Basic immediate-mode UI context (rect, label, button)
+- [x] Font rendering with correct baseline
+- [x] Anchor system for screen-edge positioning
+- [ ] Retained mode widget system (panel, list, tree, inspector)
+- [ ] Text input widget
+- [ ] Scrollable panels
+- [ ] Nine-slice panel rendering for scalable UI backgrounds
+- [ ] Proper alpha blending for UI (currently using discard)
+
+## Input
+- [x] Keyboard input (pressed, held, released)
+- [x] Mouse position and delta
+- [x] Mouse capture for FPS camera
+- [x] Keybind system with callbacks
+- [ ] Gamepad support
+- [ ] Mouse scroll wheel
+- [ ] Key modifier support (ctrl, shift, alt) in keybinds
+
+## Camera
+- [x] 2D orthographic camera with pixel coordinates
+- [x] 3D perspective camera with FPS movement
+- [x] Mouse look with pitch/yaw
+- [x] Camera as ECS resource
+- [ ] Orbit camera (useful for scene editor)
+- [ ] Camera frustum culling
+
+## ECS
+- [x] Entity creation and destruction
+- [x] Component add/get/remove
+- [x] View queries with multiple components
+- [x] Light as ECS component
+- [x] Anchor as ECS component
+- [ ] Switch to in-house ECS
+- [ ] Component events (on_add, on_remove)
+- [ ] Entity parenting and hierarchies
+- [ ] ECS serialization
+
+## Audio
+- [ ] Audio system integration (miniaudio recommended)
+- [ ] Play/stop/pause sounds
+- [ ] Looping background music
+- [ ] 3D positional audio
+- [ ] Volume and pitch control
+- [ ] Audio as ECS component
+
+## Physics
+- [ ] 2D AABB collision detection
+- [ ] 2D collision response
+- [ ] 3D collision detection
+- [ ] Rigidbody component
+- [ ] Trigger volumes
+
+## Serialization & Prefabs
+- [ ] Component serialization to JSON or custom binary format
+- [ ] Prefab file format (groups of entities with components)
+- [ ] Prefab runtime (spawn entities from prefab files)
+- [ ] Hot reload of prefab files
+
+## Scene Editor
+- [ ] Separate editor executable using engine as library
+- [ ] 3D viewport with orbit camera
+- [ ] Entity hierarchy panel
+- [ ] Component inspector panel
+- [ ] Asset browser
+- [ ] Save/load prefab files
+- [ ] Basic scripting API
+
+## Engine & Utilities
+- [x] App resource system
+- [x] Scheduler with phases and priorities
+- [x] Frame and generic allocators
+- [x] Time and delta time
+- [x] FPS counter with rolling average
+- [x] FPS limiter
+- [x] Window resize handling
+- [x] Random number generation (currently timestamp-based, needs proper RNG)
+- [ ] Fix memory leaks (mostly shutdown logic)
+- [ ] Proper error handling (replace unreachable with error propagation)
+- [ ] Documentation on all public APIs
+- [ ] CLI argument support (renderer backend selection etc)
+- [ ] Asset manager with reference counting
+- [ ] Logging system with levels and categories
+- [ ] Profiling and performance counters

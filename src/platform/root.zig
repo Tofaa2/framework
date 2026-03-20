@@ -3,21 +3,11 @@ const builtin = @import("builtin");
 
 pub const c = @import("thirdparty").rgfw;
 
-pub const ResizeCallback = *const fn (*Window, u32, u32) void;
-pub const ResizeCallbacks = std.ArrayListUnmanaged(ResizeCallback);
-
-pub const Callbacks = struct {
-    allocator: std.mem.Allocator = std.heap.c_allocator,
-
-    resize: ResizeCallbacks = .empty,
-};
-
 pub const Window = struct {
     handle: ?*c.RGFW_window,
     width: u32,
     height: u32,
     data: []usize, // TODO: Probably ArrayList is better
-    callbacks: Callbacks = .{},
     mouse_delta: [2]f32 = .{ 0.0, 0.0 },
     resized_last_frame: bool = false,
     pub fn getFrameBufferSize(self: *Window) [2]i32 {
@@ -87,16 +77,42 @@ pub const Window = struct {
             .macos => c.RGFW_window_getWindow_OSX(self.handle),
             .linux => {
                 const env = std.posix.getenv;
-                if (env("DISPLAY")) |_| {
-                    return c.RGFW_window_getWindow_X11(self.handle);
-                } else if (env("XDG_SESSION_TYPE")) |_| {
-                    return c.RGFW_window_getWindow_X11(self.handle); // idk the handle for this honestly
+                var ptr: ?*anyopaque = null;
+                if (env("DISPLAY") !=  null or env("XDG_SESSION_TYPE") != null) { 
+                    ptr =  @ptrFromInt(c.RGFW_window_getWindow_X11(self.handle));
                 } else if (env("WAYLAND_DISPLAY")) |_| {
-                    return c.RGFW_window_getWindow_Wayland(self.handle);
+                    ptr = (c.RGFW_window_getWindow_Wayland(self.handle));
                 }
+                else {
+                    @panic("Idk what your linux window manager is bruh");
+                }
+                return ptr;
             },
             else => @panic("Your OS is not supported for the custom Window struct"),
         };
+    }
+
+    pub fn getNativeNdt(self: *Window) ?*anyopaque {
+        return switch (builtin.os.tag) {
+            .windows => c.RGFW_window_getHDC(self.handle),
+            .linux => {
+                const env = std.posix.getenv;
+                var ptr: ?*anyopaque = null;
+                if (env("DISPLAY") != null or env("XDG_SESSION_TYPE") != null) {
+                    ptr = c.RGFW_getDisplay_X11();
+                }
+                else if (env("WAYLAND_DISPLAY") != null) {
+                    ptr = c.RGFW_getDisplay_Wayland();
+                }
+                else {
+                    @panic("Idk what your linux window manager is bruh");
+                }
+                return ptr;
+            },
+            else => {
+                return null;
+            }
+        } ;
     }
 
     pub fn setIcon(self: *Window, data: [*c]const u8, width: u32, height: u32, format: RGFW_format) void {
