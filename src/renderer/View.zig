@@ -38,6 +38,12 @@ pub fn addDynamicMesh(self: *Self, mesh: *DynamicMesh) void {
     self.dynamic_meshes.append(self.allocator, mesh) catch unreachable;
 }
 
+pub fn deinit(self: *Self) void {
+    self.transient_submissions.deinit(self.allocator);
+    self.dynamic_meshes.deinit(self.allocator);
+    self.meshes.deinit(self.allocator);
+}
+
 pub const TransientSubmission = struct {
     vertices: []Vertex,
     indices: []u16,

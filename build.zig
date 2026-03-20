@@ -68,6 +68,7 @@ fn setupExamples(b: *std.Build, target: Target, optimize: Optimize, imports: Imp
 
     const names: []const Example = &.{
         .{ .name = "snake", .path = "examples/snake.zig" },
+        .{ .name = "basic", .path = "examples/basic.zig"},
     };
 
     for (names) |example| {

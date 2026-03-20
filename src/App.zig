@@ -38,9 +38,7 @@ pub fn init(config: AppConfig) Self {
         .allocators = config.allocators,
         .running = false,
         .world = ecs.Registry.init(config.allocators.world),
-        .scheduler = Scheduler.init(
-            .{ .allocator = config.allocators.generic },
-        ) catch unreachable,
+        .scheduler = Scheduler.init(config.allocators.generic) catch unreachable,
     };
     app.resources.add(Time{}) catch unreachable;
     app.resources.add(root.platform.Window.init(config.name, config.width, config.height)) catch unreachable;
@@ -60,7 +58,9 @@ pub fn init(config: AppConfig) Self {
 
 pub fn deinit(self: *Self) void {
     self.scheduler.run(self, .deinit);
-
+    self.scheduler.deinit();
+    self.world.deinit();
+    self.resources.getMut(root.renderer.Renderer).?.deinit(); 
     self.resources.deinit();
 }
 

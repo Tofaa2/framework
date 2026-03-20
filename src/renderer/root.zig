@@ -351,7 +351,13 @@ pub const Renderer = struct {
         while (mat_iter.next()) |entry| {
             entry.value.deinit();
         }
+        bgfx.destroyUniform(self.tex_uniform);
         bgfx.shutdown();
+        
+        var view_iter = self.views.iterator();
+        while (view_iter.next()) |entry| {
+            entry.value_ptr.deinit();
+        }
         self.views.deinit();
     }
 };
