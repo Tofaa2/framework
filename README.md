@@ -9,7 +9,9 @@ Framework is extremely bare-bones by design. The core principle is **everything 
 Something that takes a few button clicks in Unity might take 100 lines of code in Framework — and that's intentional. The goal isn't to minimize lines written, it's to give you full control over what happens and when. Down the line a scene editor will make common workflows less painful, but the low-level approach remains the foundation.
  
 Primitives and components used across the codebase live in `src/primitive`. That's where you'll spend most of your time.
- 
+
+
+
 ## Getting Started
  
 ```bash
@@ -192,3 +194,9 @@ fn mySystem(app: *runtime.App) void {
 - [ ] Asset manager with reference counting
 - [ ] Logging system with levels and categories
 - [ ] Profiling and performance counters
+- [ ] Redo asset and resource approach completely, tighly couple specific areas (see #Structural Changes)
+
+
+# Structural Changes
+
+I chose a specific design in my head before starting on actually writing the code for this, hence i am now suffering the consequences. I want to decouple resource_pool into making its purpose explicitly storing app/game state and resources, such as GameState enum, Score, etc etc. And then decouple renderer, window, time, etc directly into an application itself. This way we reduce a lot of overhead from accessing resource pool 100s of times a frame, and also makes the mental model and the code model much simpler. I also want to convert to an asset system, and introduce reference counting for assets
