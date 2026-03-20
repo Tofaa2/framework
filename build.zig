@@ -19,7 +19,7 @@ pub fn build(b: *Build) !void {
     }) });
     thirdparty.addIncludePath(b.path("thirdparty/"));
     thirdparty.addCSourceFiles(.{
-        .files = &.{ "RGFW_Impl.c", "stb_truetype_impl.c" },
+        .files = &.{ "RGFW_Impl.c", "stb_truetype_impl.c", "microui.c" },
         .root = b.path("thirdparty/"),
     });
     switch (target.result.os.tag) {
@@ -111,6 +111,16 @@ fn linkBgfx(b: *std.Build, target: std.Build.ResolvedTarget, optimize: std.built
                 .name = "vs_basic",
                 .shaderType = .vertex,
                 .path = b.path("src/renderer/shaders/vs_basic.sc"),
+            },
+            .{
+                .name = "fs_diffuse",
+                .shaderType = .fragment,
+                .path = b.path("src/renderer/shaders/fs_diffuse.sc"),
+            },
+            .{
+                .name = "vs_diffuse",
+                .shaderType = .vertex,
+                .path = b.path("src/renderer/shaders/vs_diffuse.sc"),
             },
         },
     );

@@ -8,12 +8,15 @@ Framework is extremely bare-bones, the design philosophy is maximum flexibility,
 
 ## TODO:
 - [x] Restructure renderbatch and views to support proper optimizations for each type of renderable, at the moment we use transient buffers which is only good for per-frame geometry like text
+- [x] Basic MTL parser
+- [x] Normals 
 - [ ] Fix memory leaks (im lazy, most of them are shutdown logic)
 - [x] Improve camera system
 - [ ] Introduce more primitives and renderables
+- [ ] UI
 - [x] Static mesh rendering
 - [ ] Basic Physics
-- [ ] Materials, lighting, render passes
+- [ ] Materials, lighting, render passes ( right now only directional light exists )
 - [ ] Introduce a better pipeline and more views, atm we only have @"2d" for 2d rendering and @"3d" for 3d rendering
 - [ ] Let user take cli arguments easily, allowing for cli args for renderer type etc.
 - [ ] Prefab system for creating "default" entities

@@ -14,8 +14,7 @@ pub const Map = std.AutoArrayHashMap(Id, Self);
 pub const Id = enum(u8) {
     @"2d" = 0,
     @"3d" = 1,
-
-    // TODO: add render passes
+    ui = 2,
 };
 
 id: Id,
@@ -45,4 +44,5 @@ pub const TransientSubmission = struct {
     shader: ?ShaderProgram,
     texture: ?*const Image,
     transform: ?math.Mat,
+    blend: bool = false,
 };

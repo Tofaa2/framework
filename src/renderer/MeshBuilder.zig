@@ -192,7 +192,19 @@ pub fn buildDynamicMesh(self: *MeshBuilder, layout: *const bgfx.VertexLayout) Dy
 /// The mesh is not stored in the view's mesh list and is not persistent across frames.
 /// The allocated transient buffer lives in the gpu memory and is freed after each frame.
 /// This should be used for quads that update constantly, such as text.
-pub fn submitTransient(self: *MeshBuilder, view: *View, shader: ?ShaderProgram, texture: ?*const Image, transform: ?math.Mat) void {
+pub fn submitTransient(self: *MeshBuilder, view: *View, shader: ?ShaderProgram, texture: ?*const Image, transform: ?math.Mat, blend: bool) void {
+    if (self.vertices.items.len == 0) return;
+    view.transient_submissions.append(self.allocator, .{
+        .vertices = self.allocator.dupe(Vertex, self.vertices.items) catch unreachable,
+        .indices = self.allocator.dupe(u16, self.indices.items) catch unreachable,
+        .shader = shader,
+        .texture = texture,
+        .transform = transform,
+        .blend = blend,
+    }) catch unreachable;
+}
+
+pub fn submitTransient0(self: *MeshBuilder, view: *View, shader: ?ShaderProgram, texture: ?*const Image, transform: ?math.Mat) void {
     if (self.vertices.items.len == 0) return;
     view.transient_submissions.append(self.allocator, .{
         .vertices = self.allocator.dupe(Vertex, self.vertices.items) catch unreachable,

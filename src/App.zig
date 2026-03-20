@@ -50,7 +50,9 @@ pub fn init(config: AppConfig) Self {
         app.resources.getMut(root.platform.Window).?.getNativePtr(),
         config.debug,
     ) catch unreachable) catch unreachable;
-
+    app.resources.add(root.primitive.AmbientLight{
+        .color = .{ .r = 100, .g = 100, .b = 100, .a = 255 },
+    }) catch unreachable;
     app.resources.add(root.primitive.FpsCounter{}) catch unreachable;
     return app;
 }
@@ -104,6 +106,48 @@ fn renderPrimitive(self: *Self, renderer: *root.renderer.Renderer) void {
     const view_2d = renderer.getView(.@"2d").?;
     const allocator = self.allocators.generic;
 
+    const ambient = self.resources.get(root.primitive.AmbientLight) orelse &root.primitive.AmbientLight{};
+    const ambient_color: [4]f32 = .{
+        @as(f32, @floatFromInt(ambient.color.r)) / 255.0,
+        @as(f32, @floatFromInt(ambient.color.g)) / 255.0,
+        @as(f32, @floatFromInt(ambient.color.b)) / 255.0,
+        1.0,
+    };
+    const MAX_LIGHTS = 4;
+    var light_dirs: [MAX_LIGHTS][4]f32 = std.mem.zeroes([MAX_LIGHTS][4]f32);
+    var light_colors: [MAX_LIGHTS][4]f32 = std.mem.zeroes([MAX_LIGHTS][4]f32);
+    var light_count: u32 = 0;
+
+    var light_query = self.world.view(.{ root.primitive.Transform, root.primitive.Light }, .{});
+    var light_iter = light_query.entityIterator();
+    while (light_iter.next()) |entity| {
+        if (light_count >= MAX_LIGHTS) break;
+        const transform = light_query.getConst(root.primitive.Transform, entity);
+        const light = light_query.getConst(root.primitive.Light, entity);
+
+        const rx = transform.rotation[0];
+        const ry = transform.rotation[1];
+        light_dirs[light_count] = .{
+            @cos(rx) * @sin(ry),
+            -@sin(rx),
+            @cos(rx) * @cos(ry),
+            0.0,
+        };
+        light_colors[light_count] = .{
+            @as(f32, @floatFromInt(light.color.r)) / 255.0 * light.intensity,
+            @as(f32, @floatFromInt(light.color.g)) / 255.0 * light.intensity,
+            @as(f32, @floatFromInt(light.color.b)) / 255.0 * light.intensity,
+            1.0,
+        };
+        light_count += 1;
+    }
+
+    const diffuse_mat = renderer.getMaterial(.diffuse);
+    diffuse_mat.setVec4Array("u_lightDirs", &light_dirs, MAX_LIGHTS);
+    diffuse_mat.setVec4Array("u_lightColors", &light_colors, MAX_LIGHTS);
+    diffuse_mat.setVec4("u_lightCount", .{ @as(f32, @floatFromInt(light_count)), 0.0, 0.0, 0.0 });
+    diffuse_mat.setVec4("u_ambient", ambient_color);
+
     var builder = root.renderer.MeshBuilder.init(allocator);
     defer builder.deinit();
 
@@ -118,15 +162,13 @@ fn renderPrimitive(self: *Self, renderer: *root.renderer.Renderer) void {
         switch (renderable) {
             .circle => |circle| {
                 const segments: u32 = circle.segments orelse 16;
-                // build at origin, transform moves it
-                builder.pushCircle(0.0, 0.0, circle.radius, segments, tint);
-                builder.submitTransient(view_2d, null, null, transform.toMatrix());
+                builder.pushCircle(transform.center[0], transform.center[1], circle.radius, segments, tint);
+                builder.submitTransient(view_2d, null, null, null, false);
                 builder.reset();
             },
             .rect => |rect| {
-                // centered at origin
-                builder.pushRect(-rect.width * 0.5, -rect.height * 0.5, rect.width, rect.height, tint);
-                builder.submitTransient(view_2d, null, null, transform.toMatrix());
+                builder.pushRect(transform.center[0] - rect.width * 0.5, transform.center[1] - rect.height * 0.5, rect.width, rect.height, tint);
+                builder.submitTransient(view_2d, null, null, null, false);
                 builder.reset();
             },
             else => {},
@@ -144,23 +186,29 @@ fn renderPrimitive(self: *Self, renderer: *root.renderer.Renderer) void {
         }
         switch (renderable) {
             .sprite => |sprite| {
-                const w = @as(f32, @floatFromInt(sprite.image.width));
-                const h = @as(f32, @floatFromInt(sprite.image.height));
-                builder.pushTexturedRect(-w * 0.5, -h * 0.5, w, h, tint);
-                builder.submitTransient(view_2d, null, sprite.image, transform.toMatrix());
+                const w: f32 = @floatFromInt(sprite.image.width);
+                const h: f32 = @floatFromInt(sprite.image.height);
+                builder.pushTexturedRect(transform.center[0] - w * 0.5, transform.center[1] - h * 0.5, w, h, tint);
+                builder.submitTransient(view_2d, null, sprite.image, null, false);
                 builder.reset();
             },
             .text => |t| {
-                builder.pushText(t.font, t.content, 0.0, 0.0, tint);
-                builder.submitTransient(view_2d, null, &t.font.atlas, transform.toMatrix());
+                builder.pushText(t.font, t.content, transform.center[0], transform.center[1], tint);
+                builder.submitTransient(view_2d, null, &t.font.atlas, null, true);
                 builder.reset();
             },
             .fmt_text => |*t| {
                 const text = t.format_fn(t.buf, self);
-                builder.pushText(t.font, text, 0.0, 0.0, tint);
-                builder.submitTransient(view_2d, null, &t.font.atlas, transform.toMatrix());
+                builder.pushText(t.font, text, transform.center[0], transform.center[1], tint);
+                builder.submitTransient(view_2d, null, &t.font.atlas, null, true);
                 builder.reset();
             },
+            // .fmt_text => |*t| {
+            //     const text = t.format_fn(t.buf, self);
+            //     builder.pushText(t.font, text, 0.0, 0.0, tint);
+            //     builder.submitTransient(view_2d, null, &t.font.atlas, transform.toMatrix(), true);
+            //     builder.reset();
+            // },
             else => {},
         }
     }
@@ -174,77 +222,10 @@ fn renderPrimitive(self: *Self, renderer: *root.renderer.Renderer) void {
         switch (renderable) {
             .mesh => |*m| {
                 m.mesh.transform = transform.toMatrix();
+                if (m.mesh.material == null) {
+                    m.mesh.material = renderer.getMaterial(.diffuse);
+                }
                 view_3d.addMesh(m.mesh);
-            },
-            else => {},
-        }
-    }
-}
-fn renderPrimitive0(self: *Self, renderer: *root.renderer.Renderer) void {
-    var query = self.world.view(.{ root.primitive.Transform, root.primitive.Renderable }, .{});
-    var iter = query.entityIterator();
-    const view = renderer.getView(.@"2d").?;
-    const allocator = self.allocators.generic;
-
-    var builder = root.renderer.MeshBuilder.init(allocator);
-    defer builder.deinit();
-
-    // pass 1: all untextured geometry (circles, rects, lines)
-    while (iter.next()) |entity| {
-        const transform = query.getConst(root.primitive.Transform, entity);
-        const renderable = query.getConst(root.primitive.Renderable, entity);
-        var tint: root.primitive.Color = .white;
-        if (self.world.tryGetConst(root.primitive.Color, entity)) |color| {
-            tint = color;
-        }
-        switch (renderable) {
-            .circle => |circle| {
-                const segments: u32 = circle.segments orelse 16;
-                builder.pushCircle(transform.center[0], transform.center[1], circle.radius, segments, tint);
-            },
-            .rect => |rect| {
-                builder.pushRect(transform.center[0], transform.center[1], rect.width, rect.height, tint);
-            },
-            else => {},
-        }
-    }
-    builder.submitTransient(view, null, null, null);
-    builder.reset();
-
-    // pass 2: textured geometry grouped by texture
-    // reset iterator
-    iter = query.entityIterator();
-    while (iter.next()) |entity| {
-        const transform = query.getConst(root.primitive.Transform, entity);
-        const renderable = query.getConst(root.primitive.Renderable, entity);
-        var tint: root.primitive.Color = .white;
-        if (self.world.tryGetConst(root.primitive.Color, entity)) |color| {
-            tint = color;
-        }
-        switch (renderable) {
-            .sprite => |sprite| {
-                const w = @as(f32, @floatFromInt(sprite.image.width));
-                const h = @as(f32, @floatFromInt(sprite.image.height));
-                builder.pushTexturedRect(
-                    transform.center[0] - w * 0.5,
-                    transform.center[1] - h * 0.5,
-                    w,
-                    h,
-                    tint,
-                );
-                builder.submitTransient(view, null, sprite.image, null);
-                builder.reset();
-            },
-            .text => |t| {
-                builder.pushText(t.font, t.content, transform.center[0], transform.center[1], tint);
-                builder.submitTransient(view, null, &t.font.atlas, null);
-                builder.reset();
-            },
-            .fmt_text => |*t| {
-                const text = t.format_fn(t.buf, self);
-                builder.pushText(t.font, text, transform.center[0], transform.center[1], tint);
-                builder.submitTransient(view, null, &t.font.atlas, null);
-                builder.reset();
             },
             else => {},
         }

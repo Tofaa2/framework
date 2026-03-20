@@ -8,3 +8,5 @@ pub const Camera2D = @import("Camera2D.zig");
 pub const Camera3D = @import("Camera3D.zig");
 pub const Keybinds = @import("Keybinds.zig");
 pub const FpsCounter = @import("FpsCounter.zig");
+pub const AmbientLight = @import("AmbientLight.zig");
+pub const Light = @import("Light.zig");
