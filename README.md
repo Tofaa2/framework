@@ -185,7 +185,7 @@ fn mySystem(app: *runtime.App) void {
 - [x] FPS limiter
 - [x] Window resize handling
 - [x] Random number generation (currently timestamp-based, needs proper RNG)
-- [ ] Fix memory leaks (mostly shutdown logic)
+- [x] Fix memory leaks (mostly shutdown logic)
 - [ ] Proper error handling (replace unreachable with error propagation)
 - [ ] Documentation on all public APIs
 - [ ] CLI argument support (renderer backend selection etc)
