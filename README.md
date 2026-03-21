@@ -194,9 +194,4 @@ fn mySystem(app: *runtime.App) void {
 - [ ] Asset manager with reference counting
 - [ ] Logging system with levels and categories
 - [ ] Profiling and performance counters
-- [ ] Redo asset and resource approach completely, tighly couple specific areas (see #Structural Changes)
-
-
-# Structural Changes
-
-I chose a specific design in my head before starting on actually writing the code for this, hence i am now suffering the consequences. I want to decouple resource_pool into making its purpose explicitly storing app/game state and resources, such as GameState enum, Score, etc etc. And then decouple renderer, window, time, etc directly into an application itself. This way we reduce a lot of overhead from accessing resource pool 100s of times a frame, and also makes the mental model and the code model much simpler. I also want to convert to an asset system, and introduce reference counting for assets
+- [x] Redo asset and resource approach completely, tighly couple specific areas (see #Structural Changes)
