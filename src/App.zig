@@ -23,6 +23,8 @@ scheduler: Scheduler,
 world: ecs.Registry,
 running: bool,
 time: Time,
+window: root.platform.Window,
+
 
 pub const AppConfig = struct {
     name: []const u8 = "framework-app",
@@ -41,8 +43,9 @@ pub fn init(config: AppConfig) Self {
         .world = ecs.Registry.init(config.allocators.world),
         .scheduler = Scheduler.init(config.allocators.generic) catch unreachable,
         .time = Time.init(),
+        .window = root.platform.Window.init(config.title, config.width, config.height),
     };
-    app.resources.add(root.platform.Window.init(config.name, config.width, config.height)) catch unreachable;
+    // app.resources.add(root.platform.Window.init(config.name, config.width, config.height)) catch unreachable;
     app.resources.add(root.renderer.Renderer.init(
         config.allocators.generic,
         .{ .width = config.width, .height = config.height },
