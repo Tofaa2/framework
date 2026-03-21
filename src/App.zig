@@ -25,6 +25,7 @@ running: bool,
 time: Time,
 renderer: *root.renderer.Renderer,
 window: root.platform.Window,
+assets: root.core.AssetPool,
 
 pub const AppConfig = struct {
     name: []const u8 = "framework-app",
@@ -45,6 +46,7 @@ pub fn init(config: AppConfig) Self {
         .time = Time.init(),
         .window = root.platform.Window.init(config.name, config.width, config.height),
         .renderer = undefined,
+        .assets = root.core.AssetPool.init(config.allocators.generic),
     };
 
     var renderer = config.allocators.generic.create(root.renderer.Renderer) catch unreachable;
@@ -69,6 +71,7 @@ pub fn deinit(self: *Self) void {
     self.world.deinit();
     self.renderer.deinit();
     self.allocators.generic.destroy(self.renderer);
+    self.assets.deinit();
     self.resources.deinit();
 }
 
