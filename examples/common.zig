@@ -2,7 +2,7 @@ const runtime = @import("runtime");
 const std = @import("std");
 
 pub fn setFPSMax(application: *runtime.App, limit: ?u32) void {
-    application.resources.getMut(runtime.primitive.Time).?.fps_limit = limit;
+    application.time.fps_limit = limit;
 }
 
 
@@ -35,10 +35,6 @@ pub fn drawFPS(app: *runtime.App, font: *runtime.primitive.Font, anchor: runtime
     });
 
     app.world.add(fps_label, anchor);
-    // app.world.add(fps_label, runtime.primitive.Anchor{
-    //     .point = .top_right,
-    //     .offset = .{ -100.0, 100.0 },
-    // });
     app.world.add(fps_label, runtime.primitive.Color.red);
 }
 

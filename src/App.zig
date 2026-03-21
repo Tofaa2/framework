@@ -25,7 +25,6 @@ running: bool,
 time: Time,
 window: root.platform.Window,
 
-
 pub const AppConfig = struct {
     name: []const u8 = "framework-app",
     width: u32 = 800,
@@ -43,14 +42,13 @@ pub fn init(config: AppConfig) Self {
         .world = ecs.Registry.init(config.allocators.world),
         .scheduler = Scheduler.init(config.allocators.generic) catch unreachable,
         .time = Time.init(),
-        .window = root.platform.Window.init(config.title, config.width, config.height),
+        .window = root.platform.Window.init(config.name, config.width, config.height),
     };
-    // app.resources.add(root.platform.Window.init(config.name, config.width, config.height)) catch unreachable;
     app.resources.add(root.renderer.Renderer.init(
         config.allocators.generic,
         .{ .width = config.width, .height = config.height },
-        app.resources.getMut(root.platform.Window).?.getNativePtr(),
-        app.resources.getMut(root.platform.Window).?.getNativeNdt(),
+        app.window.getNativePtr(),
+        app.window.getNativeNdt(),
         config.debug,
     ) catch unreachable) catch unreachable;
     app.resources.add(root.primitive.AmbientLight{
@@ -80,17 +78,15 @@ pub fn run(self: *Self) void {
 
     while (self.running) {
         self.time.update(std.time.nanoTimestamp());
-        if (self.resources.getMut(root.platform.Window)) |wind| {
-            wind.update();
-            if (wind.resized_last_frame) {
-                const r_ptr = self.resources.getMut(root.renderer.Renderer);
-                if (r_ptr) |renderer| {
-                    renderer.resize(wind.width, wind.height);
-                }
-            }
-            self.running = !wind.shouldClose();
-        }
+        
         self.scheduler.run(self, .update);
+        self.window.update();
+        if (self.window.resized_last_frame) {
+            const r_ptr = self.resources.getMut(root.renderer.Renderer);
+            if (r_ptr) |renderer| {
+                renderer.resize(self.window.width, self.window.height);
+            }
+        }
         self.scheduler.run(self, .render);
 
         const r_ptr = self.resources.getMut(root.renderer.Renderer);
@@ -101,6 +97,8 @@ pub fn run(self: *Self) void {
 
         self.time.enforceFpsLimit();
         _ = self.allocators.frame_arena.reset(.retain_capacity);
+    
+        self.running = !self.window.shouldClose();
     }
 }
 
@@ -361,4 +359,3 @@ fn renderPrimitive0(self: *Self, renderer: *root.renderer.Renderer) void {
         }
     }
 }
-

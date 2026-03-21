@@ -72,7 +72,7 @@ pub fn main() !void {
     }.f });
     binds.bind(.{ .key = .escape, .on_press = struct {
         fn f(app: *runtime.App) void {
-            app.resources.getMut(runtime.platform.Window).?.setMouseCaptured(false);
+            app.window.setMouseCaptured(false);
         }
     }.f });
     binds.bind(.{ .key = .space, .on_held = struct {
@@ -90,7 +90,7 @@ pub fn main() !void {
             app.resources.getMut(runtime.primitive.Camera3D).?.moveDown(dt);
         }
     }.f });
-    application.resources.getMut(runtime.platform.Window).?.setMouseCaptured(true);
+    application.window.setMouseCaptured(true);
     application.resources.add(binds) catch unreachable;
     application.scheduler.addStage(.{
         .name = "keybinds",
@@ -109,7 +109,7 @@ pub fn main() !void {
         .run = struct {
             fn f(app: *runtime.App) void {
                 const cam = app.resources.getMut(runtime.primitive.Camera3D) orelse return;
-                var win = app.resources.getMut(runtime.platform.Window).?;
+                var win = app.window;
                 const delta = win.getMouseDelta();
                 if (delta[0] != 0 or delta[1] != 0) {
                     cam.rotate(delta[0], delta[1]);
