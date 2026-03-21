@@ -44,28 +44,29 @@ pub fn main() !void {
     var binds = runtime.primitive.Keybinds.init(allocator);
     binds.bind(.{ .key = .w, .on_held = struct {
         fn f(app: *runtime.App) void {
-            const dt: f32 = @floatCast(app.resources.get(runtime.primitive.Time).?.delta);
+            const dt: f32 = @floatCast(app.time.delta);
             app.resources.getMut(runtime.primitive.Camera3D).?.moveForward(dt);
         }
     }.f });
 
     binds.bind(.{ .key = .s, .on_held = struct {
         fn f(app: *runtime.App) void {
-            const dt: f32 = @floatCast(app.resources.get(runtime.primitive.Time).?.delta);
+            const dt: f32 = @floatCast(app.time.delta);
             app.resources.getMut(runtime.primitive.Camera3D).?.moveBackward(dt);
         }
     }.f });
 
     binds.bind(.{ .key = .a, .on_held = struct {
         fn f(app: *runtime.App) void {
-            const dt: f32 = @floatCast(app.resources.get(runtime.primitive.Time).?.delta);
+            const dt: f32 = @floatCast(app.time.delta);
             app.resources.getMut(runtime.primitive.Camera3D).?.moveLeft(dt);
         }
     }.f });
 
     binds.bind(.{ .key = .d, .on_held = struct {
         fn f(app: *runtime.App) void {
-            const dt: f32 = @floatCast(app.resources.get(runtime.primitive.Time).?.delta);
+
+            const dt: f32 = @floatCast(app.time.delta);
             app.resources.getMut(runtime.primitive.Camera3D).?.moveRight(dt);
         }
     }.f });
@@ -76,14 +77,16 @@ pub fn main() !void {
     }.f });
     binds.bind(.{ .key = .space, .on_held = struct {
         fn f(app: *runtime.App) void {
-            const dt: f32 = @floatCast(app.resources.get(runtime.primitive.Time).?.delta);
+            
+            const dt: f32 = @floatCast(app.time.delta);
             app.resources.getMut(runtime.primitive.Camera3D).?.moveUp(dt);
         }
     }.f });
 
     binds.bind(.{ .key = .shiftL, .on_held = struct {
         fn f(app: *runtime.App) void {
-            const dt: f32 = @floatCast(app.resources.get(runtime.primitive.Time).?.delta);
+            
+            const dt: f32 = @floatCast(app.time.delta);
             app.resources.getMut(runtime.primitive.Camera3D).?.moveDown(dt);
         }
     }.f });
@@ -140,7 +143,7 @@ pub fn main() !void {
         }.f,            
     } });
 
-    application.resources.getMut(runtime.primitive.Time).?.fps_limit = 165;
+    application.time.fps_limit = 165;
     const renderer = application.resources.getMut(runtime.renderer.Renderer).?;
 
     var obj_builder = runtime.renderer.MeshBuilder.init(allocator);

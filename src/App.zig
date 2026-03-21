@@ -22,6 +22,7 @@ allocators: Allocators,
 scheduler: Scheduler,
 world: ecs.Registry,
 running: bool,
+time: Time,
 
 pub const AppConfig = struct {
     name: []const u8 = "framework-app",
@@ -39,8 +40,8 @@ pub fn init(config: AppConfig) Self {
         .running = false,
         .world = ecs.Registry.init(config.allocators.world),
         .scheduler = Scheduler.init(config.allocators.generic) catch unreachable,
+        .time = Time{},
     };
-    app.resources.add(Time{}) catch unreachable;
     app.resources.add(root.platform.Window.init(config.name, config.width, config.height)) catch unreachable;
     app.resources.add(root.renderer.Renderer.init(
         config.allocators.generic,
@@ -60,7 +61,7 @@ pub fn deinit(self: *Self) void {
     self.scheduler.run(self, .deinit);
     self.scheduler.deinit();
     self.world.deinit();
-    self.resources.getMut(root.renderer.Renderer).?.deinit(); 
+    self.resources.getMut(root.renderer.Renderer).?.deinit();
     self.resources.deinit();
 }
 
@@ -73,10 +74,10 @@ pub fn run(self: *Self) void {
 
     self.scheduler.run(self, .init);
 
-    self.updateTime();
+    self.time.update(std.time.nanoTimestamp());
 
     while (self.running) {
-        self.updateTime();
+        self.time.update(std.time.nanoTimestamp());
         if (self.resources.getMut(root.platform.Window)) |wind| {
             wind.update();
             if (wind.resized_last_frame) {
@@ -362,21 +363,14 @@ fn renderPrimitive0(self: *Self, renderer: *root.renderer.Renderer) void {
 }
 
 fn updateFps(app: *Self) void {
-    const time = app.resources.get(Time).?;
-    app.resources.getMut(root.primitive.FpsCounter).?.update(@floatCast(time.delta));
+    app.resources.getMut(root.primitive.FpsCounter).?.update(@floatCast(app.time.delta));
 }
-fn updateTime(self: *Self) void {
-    var time = self.resources.getMut(Time);
-    time.?.update(std.time.nanoTimestamp());
-}
-
 fn enforceFpsLimit(app: *Self) void {
-    const time = app.resources.getMut(Time) orelse return;
-    const limit = time.fps_limit orelse return;
+    const limit = app.time.fps_limit orelse return;
 
     const target_ns: u64 = @intFromFloat(1_000_000_000.0 / @as(f64, @floatFromInt(limit)));
     const now: u64 = @intCast(std.time.nanoTimestamp());
-    const frame_start: u64 = @intCast(time.last_frame);
+    const frame_start: u64 = @intCast(app.time.last_frame);
     const elapsed = now - frame_start;
 
     if (elapsed < target_ns) {
