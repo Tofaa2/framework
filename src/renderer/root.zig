@@ -163,16 +163,6 @@ pub const Renderer = struct {
                 1.0,
             );
         }
-        // if (self.views.getPtr(.@"2d")) |v| {
-        //     v.proj_mtx = math.orthographicOffCenterRhGl(
-        //         0.0,
-        //         @floatFromInt(width),
-        //         @floatFromInt(height),
-        //         0.0,
-        //         -1.0,
-        //         1.0,
-        //     );
-        // }
         if (self.views.getPtr(.@"3d")) |v| {
             v.proj_mtx = zm.perspectiveFovRhGl(
                 0.25 * std.math.pi,

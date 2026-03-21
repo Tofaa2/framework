@@ -40,7 +40,7 @@ pub fn init(config: AppConfig) Self {
         .running = false,
         .world = ecs.Registry.init(config.allocators.world),
         .scheduler = Scheduler.init(config.allocators.generic) catch unreachable,
-        .time = Time{},
+        .time = Time.init(),
     };
     app.resources.add(root.platform.Window.init(config.name, config.width, config.height)) catch unreachable;
     app.resources.add(root.renderer.Renderer.init(
@@ -53,7 +53,6 @@ pub fn init(config: AppConfig) Self {
     app.resources.add(root.primitive.AmbientLight{
         .color = .{ .r = 100, .g = 100, .b = 100, .a = 255 },
     }) catch unreachable;
-    app.resources.add(root.primitive.FpsCounter{}) catch unreachable;
     return app;
 }
 
@@ -97,8 +96,7 @@ pub fn run(self: *Self) void {
             renderer.draw();
         }
 
-        self.updateFps();
-        self.enforceFpsLimit();
+        self.time.enforceFpsLimit();
         _ = self.allocators.frame_arena.reset(.retain_capacity);
     }
 }
@@ -128,7 +126,6 @@ fn updateLights(self: *Self, renderer: *root.renderer.Renderer) void {
         @as(f32, @floatFromInt(ambient.color.b)) / 255.0,
         1.0,
     };
-
     const MAX_LIGHTS = 4;
     var light_dirs: [MAX_LIGHTS][4]f32 = std.mem.zeroes([MAX_LIGHTS][4]f32);
     var light_colors: [MAX_LIGHTS][4]f32 = std.mem.zeroes([MAX_LIGHTS][4]f32);
@@ -362,18 +359,3 @@ fn renderPrimitive0(self: *Self, renderer: *root.renderer.Renderer) void {
     }
 }
 
-fn updateFps(app: *Self) void {
-    app.resources.getMut(root.primitive.FpsCounter).?.update(@floatCast(app.time.delta));
-}
-fn enforceFpsLimit(app: *Self) void {
-    const limit = app.time.fps_limit orelse return;
-
-    const target_ns: u64 = @intFromFloat(1_000_000_000.0 / @as(f64, @floatFromInt(limit)));
-    const now: u64 = @intCast(std.time.nanoTimestamp());
-    const frame_start: u64 = @intCast(app.time.last_frame);
-    const elapsed = now - frame_start;
-
-    if (elapsed < target_ns) {
-        std.Thread.sleep(target_ns - elapsed);
-    }
-}
