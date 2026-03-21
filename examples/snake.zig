@@ -95,7 +95,7 @@ pub fn main() !void {
         .buf = &fps_buf,
         .format_fn = struct {
             fn f(buf: []u8, a: *runtime.App) []u8 {
-                const fps = a.resources.get(runtime.primitive.FpsCounter).?.fps;
+                const fps = a.time.fps.fps;
                 return std.fmt.bufPrint(buf, "FPS: {d:.0}", .{fps}) catch buf[0..0];
             }
         }.f,
