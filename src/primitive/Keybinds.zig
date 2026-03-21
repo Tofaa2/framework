@@ -31,7 +31,7 @@ pub fn bind(self: *KeyBinds, keybind: KeyBind) void {
 }
 
 pub fn update(self: *KeyBinds, app: *runtime.App) void {
-    var win = app.window;
+    var win = &app.window;
     for (self.binds.items) |kb| {
         if (win.isKeyPressed(kb.key)) {
             if (kb.on_press) |f| f(app);

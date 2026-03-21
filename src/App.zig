@@ -81,18 +81,18 @@ pub fn run(self: *Self) void {
 
     self.scheduler.run(self, .init);
 
-    self.time.update(std.time.nanoTimestamp());
+    self.time.update();
 
     while (self.running) {
-        self.time.update(std.time.nanoTimestamp());
+        self.time.update();
 
-        self.scheduler.run(self, .update);
         self.window.update();
         if (self.window.resized_last_frame) {
             self.renderer.resize(self.window.width, self.window.height);
         }
-        self.scheduler.run(self, .render);
+        self.scheduler.run(self, .update);
 
+        self.scheduler.run(self, .render);
         self.renderPrimitive();
         self.renderer.draw();
         self.time.enforceFpsLimit();
