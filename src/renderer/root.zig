@@ -106,13 +106,6 @@ pub const Renderer = struct {
             .id = .@"2d",
             .allocator = allocator,
         }) catch unreachable;
-        // views.put(.@"2d", .{
-        //     .proj_mtx = math.orthographicOffCenterRhGl(0.0, @floatFromInt(viewport.width), @floatFromInt(viewport.height), 0.0, -1.0, 1.0),
-        //     .id = .@"2d",
-        //     .allocator = allocator,
-        // }) catch unreachable;
-        // bgfx.setDebug(bgfx.DebugFlags_Stats);
-
         views.put(.@"3d", .{
             .clear_flags = bgfx.ClearFlags_Depth,
             .proj_mtx = zm.perspectiveFovRhGl(
