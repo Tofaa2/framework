@@ -8,12 +8,15 @@ const Image = @import("../primitive/Image.zig");
 const math = @import("math.zig");
 const Mesh = @This();
 const Material = @import("Material.zig");
+const Handle = @import("../core/AssetPool.zig").Handle;
 
 vbh: bgfx.VertexBufferHandle,
 ibh: bgfx.IndexBufferHandle,
 num_vertices: u32,
 num_indices: u32,
 material: ?*Material = null,
+
+
 texture: ?*const Image = null,
 transform: ?math.Mat = null,
 owned_texture: ?Image = null,

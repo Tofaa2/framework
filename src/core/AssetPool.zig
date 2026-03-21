@@ -35,7 +35,7 @@ pub fn deinit(self: *AssetManager) void {
 }
 
 // ─── Font ────────────────────────────────────────────────────────────────────
-pub fn loadFont(self: *AssetManager, path: []const u8, size: u32, atlas_size: u32) !Handle(Font) {
+pub fn loadFont(self: *AssetManager, path: []const u8, size: f32, atlas_size: u32) !Handle(Font) {
     const font = Font.initFile(path, size, atlas_size);
     return self.loadAsset(Font, font);
 }

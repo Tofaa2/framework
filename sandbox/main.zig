@@ -21,11 +21,11 @@ pub fn main() !void {
     });
     defer application.deinit();
 
-    const shinoa = runtime.primitive.Image.initFile("assets/shinoa.png");
-    defer shinoa.deinit();
+    // const shinoa = try application.assets.loadImage("assets/shinoa.png");
 
-    var font = runtime.primitive.Font.initFile("assets/Roboto-Regular.ttf", 32, 512);
-    defer font.deinit();
+    const font = try application.assets.loadFont("assets/Roboto-Regular.ttf", 32, 512);
+    // var font = runtime.primitive.Font.initFile("assets/Roboto-Regular.ttf", 32, 512);
+    // defer font.deinit();
     const camera_3d = runtime.primitive.Camera3D.init();
     application.resources.add(camera_3d) catch unreachable;
 
@@ -132,7 +132,7 @@ pub fn main() !void {
         },
     });
     application.world.add(fps_label, runtime.primitive.Renderable{ .fmt_text = .{
-        .font = &font,
+        .font = font,
         .buf = &fps_buf,
         .format_fn = struct {
             fn f(buf: []u8, app: *runtime.App) []u8 {
@@ -144,7 +144,6 @@ pub fn main() !void {
 
     application.time.fps_limit = 165;
     var renderer = application.renderer;
-
     var obj_builder = runtime.renderer.MeshBuilder.init(allocator);
     defer obj_builder.deinit();
     const result = try runtime.renderer.ObjLoader.load(allocator, "assets/animal-bunny.obj", &obj_builder);

@@ -61,8 +61,9 @@ pub fn main() !void {
     });
     defer app.deinit();
 
-    var font = runtime.primitive.Font.initFile("assets/Roboto-Regular.ttf", 32, 512);
-    defer font.deinit();
+    // var font = runtime.primitive.Font.initFile("assets/Roboto-Regular.ttf", 32, 512);
+    // defer font.deinit();
+    const font = try app.assets.loadFont("assets/Roboto-Regular.ttf", 32, 512);
 
     common.setFPSMax(&app, 60);
     try app.resources.add(Score{});
@@ -91,7 +92,7 @@ pub fn main() !void {
     app.world.add(fps_label, runtime.primitive.Transform{});
     app.world.add(fps_label, runtime.primitive.Anchor{ .point = .top_right, .offset = .{ -150.0, 10.0 } });
     app.world.add(fps_label, runtime.primitive.Renderable{ .fmt_text = .{
-        .font = &font,
+        .font = font,
         .buf = &fps_buf,
         .format_fn = struct {
             fn f(buf: []u8, a: *runtime.App) []u8 {
@@ -106,7 +107,7 @@ pub fn main() !void {
     app.world.add(score_label, runtime.primitive.Transform{});
     app.world.add(score_label, runtime.primitive.Anchor{ .point = .top_left, .offset = .{ 10.0, 10.0 } });
     app.world.add(score_label, runtime.primitive.Renderable{ .fmt_text = .{
-        .font = &font,
+        .font = font,
         .buf = &score_buf,
         .format_fn = struct {
             fn f(buf: []u8, a: *runtime.App) []u8 {
@@ -121,7 +122,7 @@ pub fn main() !void {
     app.world.add(game_over_label, runtime.primitive.Transform{});
     app.world.add(game_over_label, runtime.primitive.Anchor{ .point = .center, .offset = .{ -280.0, -20.0 } });
     app.world.add(game_over_label, runtime.primitive.Renderable{ .fmt_text = .{
-        .font = &font,
+        .font = font,
         .buf = &game_over_buf,
         .format_fn = struct {
             fn f(buf: []u8, a: *runtime.App) []u8 {

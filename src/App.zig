@@ -184,21 +184,26 @@ fn render2D(self: *Self, renderer: *root.renderer.Renderer, builder: *root.rende
                 builder.reset();
             },
             .sprite => |sprite| {
-                const w: f32 = @floatFromInt(sprite.image.width);
-                const h: f32 = @floatFromInt(sprite.image.height);
+                const image = self.assets.getImage(sprite.image) orelse return; 
+
+                const w: f32 = @floatFromInt(image.width);
+                const h: f32 = @floatFromInt(image.height);
                 builder.pushTexturedRect(pos[0] - w * 0.5, pos[1] - h * 0.5, w, h, tint);
-                builder.submitTransient(view_2d, null, sprite.image, null, false);
+                builder.submitTransient(view_2d, null, image, null, false);
                 builder.reset();
             },
             .text => |t| {
-                builder.pushText(t.font, t.content, pos[0], pos[1], tint);
-                builder.submitTransient(view_2d, null, &t.font.atlas, null, true);
+                const font = self.assets.getFont(t.font).?;
+                builder.pushText(font, t.content, pos[0], pos[1], tint);
+                builder.submitTransient(view_2d, null, &font.atlas, null, true);
                 builder.reset();
             },
             .fmt_text => |*t| {
+
+                const font = self.assets.getFont(t.font).?;
                 const text = t.format_fn(t.buf, self);
-                builder.pushText(t.font, text, pos[0], pos[1], tint);
-                builder.submitTransient(view_2d, null, &t.font.atlas, null, true);
+                builder.pushText(font, text, pos[0], pos[1], tint);
+                builder.submitTransient(view_2d, null, &font.atlas, null, true);
                 builder.reset();
             },
             else => {},
