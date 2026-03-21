@@ -28,6 +28,6 @@ pub const Renderable = union(enum) {
         format_fn: *const fn (buf: []u8, app: *App) []u8,
     },
     mesh: struct {
-        mesh: *Mesh,
+        mesh: Handle(Mesh),
     },
 };

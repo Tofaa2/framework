@@ -221,12 +221,13 @@ fn render3D(self: *Self, renderer: *root.renderer.Renderer) void {
         const transform = query.getConst(root.primitive.Transform, entity);
         const renderable = query.getConst(root.primitive.Renderable, entity);
         switch (renderable) {
-            .mesh => |*m| {
-                m.mesh.transform = transform.toMatrix();
-                if (m.mesh.material == null) {
-                    m.mesh.material = renderer.getMaterial(.diffuse);
+            .mesh => |m| {
+                const mesh = self.assets.getMesh(m.mesh).?;
+                mesh.transform = transform.toMatrix();
+                if (mesh.material == null) {
+                    mesh.material = renderer.getMaterial(.diffuse);
                 }
-                view_3d.addMesh(m.mesh);
+                view_3d.addMesh(mesh);
             },
             else => {},
         }

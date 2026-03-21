@@ -140,20 +140,22 @@ pub fn main() !void {
     } });
 
     application.time.fps_limit = 165;
-    var renderer = application.renderer;
-    var obj_builder = runtime.renderer.MeshBuilder.init(allocator);
-    defer obj_builder.deinit();
-    const result = try runtime.renderer.ObjLoader.load(allocator, "assets/animal-bunny.obj", &obj_builder, &application.assets);
-    // const bunny_texture = try application.assets.loadAsset(runtime.primitive.Image, result.texture.?);
-    var obj_mesh = obj_builder.buildMesh(&renderer.vertex_layout);
-    obj_mesh.texture = result.texture; //result.texture; // add this line
+
+    const bunny_mesh = try application.assets.loadMesh(application.allocators.generic, "assets/animal-bunny.obj", &application.renderer.vertex_layout);
+
+    // var obj_builder = runtime.renderer.MeshBuilder.init(allocator);
+    // defer obj_builder.deinit();
+    // const result = try runtime.renderer.ObjLoader.load(allocator, "assets/animal-bunny.obj", &obj_builder, &application.assets);
+    // // const bunny_texture = try application.assets.loadAsset(runtime.primitive.Image, result.texture.?);
+    // var obj_mesh = obj_builder.buildMesh(&renderer.vertex_layout);
+    // obj_mesh.texture = result.texture; //result.texture; // add this line
     const mesh_entity = application.world.create();
     application.world.add(mesh_entity, runtime.primitive.Transform{
         .center = .{ 0.0, 0.0, 0.0 },
         .size = .{ 1.0, 1.0, 1.0 },
         .rotation = .{ 0.5, 0.0, 0.0 },
     });
-    application.world.add(mesh_entity, runtime.primitive.Renderable{ .mesh = .{ .mesh = &obj_mesh } });
+    application.world.add(mesh_entity, runtime.primitive.Renderable{ .mesh = .{ .mesh = bunny_mesh} });
 
     const sun = application.world.create();
     application.world.add(sun, runtime.primitive.Transform{

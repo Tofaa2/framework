@@ -5,8 +5,10 @@ const typeId = @import("../utils/type_id.zig").typeIdInt;
 pub const Image = @import("../primitive/Image.zig");
 pub const Font = @import("../primitive/Font.zig");
 pub const Mesh = @import("../renderer/Mesh.zig");
-pub const VertexLayout = @import("zbgfx").bgfx.VertexLayout;
 
+const MeshBuilder = @import("../renderer/MeshBuilder.zig");
+const VertexLayout = @import("bgfx").bgfx.VertexLayout;
+const ObjLoader = @import("../renderer/ObjLoader.zig");
 pub fn Handle(comptime T: type) type {
     _ = T;
     return struct {
@@ -35,10 +37,34 @@ pub fn deinit(self: *AssetManager) void {
     }
     self.stores.deinit();
 }
-//
-// pub fn loadObj(self: *AssetManager, path: []const u8, layout: VertexLayout) !Handle(Mesh) {
-//
-// }
+
+pub fn loadMesh(
+    self: *AssetManager,
+    allocator: std.mem.Allocator,
+    path: []const u8,
+    vertex_layout: *VertexLayout,
+) !Handle(Mesh) {
+    var builder = MeshBuilder.init(allocator);
+    defer builder.deinit();
+    const result = try ObjLoader.load(allocator, path, &builder, self);
+    var mesh = builder.buildMesh(vertex_layout);
+    mesh.texture= result.texture;
+    return self.loadAsset(Mesh, mesh);
+}
+
+pub fn getMesh(self: *AssetManager, handle: Handle(Mesh)) ?*Mesh {
+    return self.getAsset(Mesh, handle);
+}
+
+pub fn getMeshConst(self: *AssetManager, handle: Handle(Mesh)) ?*const Mesh {
+    return self.getAsset(Mesh, handle);
+}
+
+pub fn unloadMesh(self: *AssetManager, handle: Handle(Mesh)) void {
+    self.unloadAsset(Mesh, handle);
+}
+
+
 pub fn loadFont(self: *AssetManager, path: []const u8, size: f32, atlas_size: u32) !Handle(Font) {
     const font = Font.initFile(path, size, atlas_size);
     return self.loadAsset(Font, font);
