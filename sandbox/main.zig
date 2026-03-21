@@ -6,7 +6,7 @@ pub fn main() !void {
     // defer _ = gpa.deinit();
     const allocator = gpa.allocator();
 
-    var arena = std.heap.ArenaAllocator.init(std.heap.page_allocator);
+    var arena = std.heap.ArenaAllocator.init(allocator);
     defer arena.deinit();
     const arena_allocator = arena.allocator();
 
@@ -36,58 +36,60 @@ pub fn main() !void {
         .run = struct {
             fn f(app: *runtime.App) void {
                 const cam = app.resources.getMut(runtime.primitive.Camera3D) orelse return;
-                const renderer = app.resources.getMut(runtime.renderer.Renderer) orelse return;
-                renderer.getView(.@"3d").?.view_mtx = cam.getViewMatrix();
+                app.renderer.getView(.@"3d").?.view_mtx = cam.getViewMatrix();
             }
         }.f,
     }) catch unreachable;
     var binds = runtime.primitive.Keybinds.init(allocator);
     binds.bind(.{ .key = .w, .on_held = struct {
         fn f(app: *runtime.App) void {
-            const dt: f32 = @floatCast(app.resources.get(runtime.primitive.Time).?.delta);
+            const dt: f32 = @floatCast(app.time.delta);
             app.resources.getMut(runtime.primitive.Camera3D).?.moveForward(dt);
         }
     }.f });
 
     binds.bind(.{ .key = .s, .on_held = struct {
         fn f(app: *runtime.App) void {
-            const dt: f32 = @floatCast(app.resources.get(runtime.primitive.Time).?.delta);
+            const dt: f32 = @floatCast(app.time.delta);
             app.resources.getMut(runtime.primitive.Camera3D).?.moveBackward(dt);
         }
     }.f });
 
     binds.bind(.{ .key = .a, .on_held = struct {
         fn f(app: *runtime.App) void {
-            const dt: f32 = @floatCast(app.resources.get(runtime.primitive.Time).?.delta);
+            const dt: f32 = @floatCast(app.time.delta);
             app.resources.getMut(runtime.primitive.Camera3D).?.moveLeft(dt);
         }
     }.f });
 
     binds.bind(.{ .key = .d, .on_held = struct {
         fn f(app: *runtime.App) void {
-            const dt: f32 = @floatCast(app.resources.get(runtime.primitive.Time).?.delta);
+
+            const dt: f32 = @floatCast(app.time.delta);
             app.resources.getMut(runtime.primitive.Camera3D).?.moveRight(dt);
         }
     }.f });
     binds.bind(.{ .key = .escape, .on_press = struct {
         fn f(app: *runtime.App) void {
-            app.resources.getMut(runtime.platform.Window).?.setMouseCaptured(false);
+            app.window.setMouseCaptured(false);
         }
     }.f });
     binds.bind(.{ .key = .space, .on_held = struct {
         fn f(app: *runtime.App) void {
-            const dt: f32 = @floatCast(app.resources.get(runtime.primitive.Time).?.delta);
+            
+            const dt: f32 = @floatCast(app.time.delta);
             app.resources.getMut(runtime.primitive.Camera3D).?.moveUp(dt);
         }
     }.f });
 
     binds.bind(.{ .key = .shiftL, .on_held = struct {
         fn f(app: *runtime.App) void {
-            const dt: f32 = @floatCast(app.resources.get(runtime.primitive.Time).?.delta);
+            
+            const dt: f32 = @floatCast(app.time.delta);
             app.resources.getMut(runtime.primitive.Camera3D).?.moveDown(dt);
         }
     }.f });
-    application.resources.getMut(runtime.platform.Window).?.setMouseCaptured(true);
+    application.window.setMouseCaptured(true);
     application.resources.add(binds) catch unreachable;
     application.scheduler.addStage(.{
         .name = "keybinds",
@@ -106,7 +108,7 @@ pub fn main() !void {
         .run = struct {
             fn f(app: *runtime.App) void {
                 const cam = app.resources.getMut(runtime.primitive.Camera3D) orelse return;
-                var win = app.resources.getMut(runtime.platform.Window).?;
+                var win = app.window;
                 const delta = win.getMouseDelta();
                 if (delta[0] != 0 or delta[1] != 0) {
                     cam.rotate(delta[0], delta[1]);
@@ -134,19 +136,18 @@ pub fn main() !void {
         .buf = &fps_buf,
         .format_fn = struct {
             fn f(buf: []u8, app: *runtime.App) []u8 {
-                const fps = app.resources.get(runtime.primitive.FpsCounter).?.fps;
+                const fps = app.time.fps.fps;
                 return std.fmt.bufPrint(buf, "FPS: {d:.0}", .{fps}) catch buf[0..0];
             }
         }.f,            
     } });
 
-    application.resources.getMut(runtime.primitive.Time).?.fps_limit = 165;
-    const renderer = application.resources.getMut(runtime.renderer.Renderer).?;
+    application.time.fps_limit = 165;
+    var renderer = application.renderer;
 
     var obj_builder = runtime.renderer.MeshBuilder.init(allocator);
     defer obj_builder.deinit();
     const result = try runtime.renderer.ObjLoader.load(allocator, "assets/animal-bunny.obj", &obj_builder);
-    std.debug.print("texture loaded: {}\n", .{result.texture != null});
     var obj_mesh = obj_builder.buildMesh(&renderer.vertex_layout);
     obj_mesh.owned_texture = result.texture; // add this line
     const mesh_entity = application.world.create();
@@ -171,6 +172,5 @@ pub fn main() !void {
 
 fn updateCamera2d(app: *runtime.App) void {
     const cam = app.resources.getMut(runtime.primitive.Camera2D) orelse return;
-    const renderer = app.resources.getMut(runtime.renderer.Renderer) orelse return;
-    renderer.getView(.@"2d").?.view_mtx = cam.getViewMatrix();
+    app.renderer.getView(.@"2d").?.view_mtx = cam.getViewMatrix();
 }

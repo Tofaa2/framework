@@ -3,6 +3,8 @@ const builtin = @import("builtin");
 
 pub const c = @import("thirdparty").rgfw;
 
+const KEY_COUNT = 256;
+
 pub const Window = struct {
     handle: ?*c.RGFW_window,
     width: u32,
@@ -10,25 +12,47 @@ pub const Window = struct {
     data: []usize, // TODO: Probably ArrayList is better
     mouse_delta: [2]f32 = .{ 0.0, 0.0 },
     resized_last_frame: bool = false,
+    keys_pressed: [KEY_COUNT]bool = [_]bool{false} ** KEY_COUNT,
+    keys_down: [KEY_COUNT]bool = [_]bool{false} ** KEY_COUNT,
+    keys_released: [KEY_COUNT]bool = [_]bool{false} ** KEY_COUNT,
+
     pub fn getFrameBufferSize(self: *Window) [2]i32 {
         var width: i32 = undefined;
         var height: i32 = undefined;
         _ = c.RGFW_window_getSize(self.handle, &width, &height);
         return .{ width, height };
     }
-
-    pub fn isKeyReleased(self: *Window, key: RGFW_key) bool {
-        return c.RGFW_window_isKeyReleased(self.handle, @intFromEnum(key)) == 1;
+    pub fn isKeyPressed(self: *Window, key: RGFW_key) bool {
+        const k: usize = @intFromEnum(key);
+        if (k >= KEY_COUNT) return false;
+        return self.keys_pressed[k];
     }
 
     pub fn isKeyDown(self: *Window, key: RGFW_key) bool {
-        return c.RGFW_window_isKeyDown(self.handle, @intFromEnum(key)) == 1;
+        const k: usize = @intFromEnum(key);
+        if (k >= KEY_COUNT) return false;
+        return self.keys_down[k];
     }
 
-    pub fn isKeyPressed(self: *Window, key: RGFW_key) bool {
-        const res = c.RGFW_window_isKeyPressed(self.handle, @intFromEnum(key));
-        return res == 1;
+    pub fn isKeyReleased(self: *Window, key: RGFW_key) bool {
+        const k: usize = @intFromEnum(key);
+        if (k >= KEY_COUNT) return false;
+        return self.keys_released[k];
     }
+
+    //
+    // pub fn isKeyReleased(self: *Window, key: RGFW_key) bool {
+    //     return c.RGFW_window_isKeyReleased(self.handle, @intFromEnum(key)) == 1;
+    // }
+    //
+    // pub fn isKeyDown(self: *Window, key: RGFW_key) bool {
+    //     return c.RGFW_window_isKeyDown(self.handle, @intFromEnum(key)) == 1;
+    // }
+    //
+    // pub fn isKeyPressed(self: *Window, key: RGFW_key) bool {
+    //     const res = c.RGFW_window_isKeyPressed(self.handle, @intFromEnum(key));
+    //     return res == 1;
+    // }
 
     pub fn getWindowFromNative(handle: ?*c.RGFW_window) ?*Window {
         const native = c.RGFW_window_getUserPtr(handle);
@@ -78,12 +102,11 @@ pub const Window = struct {
             .linux => {
                 const env = std.posix.getenv;
                 var ptr: ?*anyopaque = null;
-                if (env("DISPLAY") !=  null or env("XDG_SESSION_TYPE") != null) { 
-                    ptr =  @ptrFromInt(c.RGFW_window_getWindow_X11(self.handle));
+                if (env("DISPLAY") != null or env("XDG_SESSION_TYPE") != null) {
+                    ptr = @ptrFromInt(c.RGFW_window_getWindow_X11(self.handle));
                 } else if (env("WAYLAND_DISPLAY")) |_| {
                     ptr = (c.RGFW_window_getWindow_Wayland(self.handle));
-                }
-                else {
+                } else {
                     @panic("Idk what your linux window manager is bruh");
                 }
                 return ptr;
@@ -100,11 +123,9 @@ pub const Window = struct {
                 var ptr: ?*anyopaque = null;
                 if (env("DISPLAY") != null or env("XDG_SESSION_TYPE") != null) {
                     ptr = c.RGFW_getDisplay_X11();
-                }
-                else if (env("WAYLAND_DISPLAY") != null) {
+                } else if (env("WAYLAND_DISPLAY") != null) {
                     ptr = c.RGFW_getDisplay_Wayland();
-                }
-                else {
+                } else {
                     @panic("Idk what your linux window manager is bruh");
                 }
                 return ptr;
@@ -112,7 +133,7 @@ pub const Window = struct {
             else => {
                 return null;
             }
-        } ;
+        };
     }
 
     pub fn setIcon(self: *Window, data: [*c]const u8, width: u32, height: u32, format: RGFW_format) void {
@@ -130,6 +151,9 @@ pub const Window = struct {
         const old_width = self.width;
         const old_height = self.height;
         self.mouse_delta = .{ 0.0, 0.0 };
+        // reset per-frame states
+        @memset(&self.keys_pressed, false);
+        @memset(&self.keys_released, false);
 
         var event: c.RGFW_event = undefined;
         while (c.RGFW_window_checkEvent(self.handle, &event) == 1) {
@@ -140,6 +164,20 @@ pub const Window = struct {
             if (event.type == c.RGFW_mousePosChanged) {
                 self.mouse_delta[0] += event.mouse.vecX;
                 self.mouse_delta[1] += event.mouse.vecY;
+            }
+            if (event.type == c.RGFW_keyPressed) {
+                const key: usize = @intCast(event.key.value);
+                if (key < KEY_COUNT) {
+                    self.keys_pressed[key] = true;
+                    self.keys_down[key] = true;
+                }
+            }
+            if (event.type == c.RGFW_keyReleased) {
+                const key: usize = @intCast(event.key.value);
+                if (key < KEY_COUNT) {
+                    self.keys_released[key] = true;
+                    self.keys_down[key] = false;
+                }
             }
         }
 
@@ -155,6 +193,36 @@ pub const Window = struct {
             self.resized_last_frame = false;
         }
     }
+
+    // fn update0(self: *Window) void {
+    //     const old_width = self.width;
+    //     const old_height = self.height;
+    //     self.mouse_delta = .{ 0.0, 0.0 };
+    //
+    //     var event: c.RGFW_event = undefined;
+    //     while (c.RGFW_window_checkEvent(self.handle, &event) == 1) {
+    //         if (event.type == 17) {
+    //             c.RGFW_window_setShouldClose(self.handle, @intFromBool(true));
+    //             break;
+    //         }
+    //         if (event.type == c.RGFW_mousePosChanged) {
+    //             self.mouse_delta[0] += event.mouse.vecX;
+    //             self.mouse_delta[1] += event.mouse.vecY;
+    //         }
+    //     }
+    //
+    //     var new_w: i32 = undefined;
+    //     var new_h: i32 = undefined;
+    //     _ = c.RGFW_window_getSize(self.handle, &new_w, &new_h);
+    //     self.width = @intCast(new_w);
+    //     self.height = @intCast(new_h);
+    //
+    //     if (old_width != self.width or old_height != self.height) {
+    //         self.resized_last_frame = true;
+    //     } else {
+    //         self.resized_last_frame = false;
+    //     }
+    // }
     pub fn getMouseDelta(self: *Window) [2]f32 {
         return self.mouse_delta;
     }

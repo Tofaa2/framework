@@ -87,6 +87,9 @@ pub fn bind(self: *const Material, tex_uniform: bgfx.UniformHandle, white_textur
     }
 }
 pub fn bindWithoutTexture(self: *const Material) void {
+    // if (self.uniforms.count() == 0) {
+    //     return;
+    // }
     var iter = self.uniforms.iterator();
     while (iter.next()) |entry| {
         const handle = self.uniform_handles.get(entry.key_ptr.*) orelse continue;

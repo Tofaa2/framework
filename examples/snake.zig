@@ -95,7 +95,7 @@ pub fn main() !void {
         .buf = &fps_buf,
         .format_fn = struct {
             fn f(buf: []u8, a: *runtime.App) []u8 {
-                const fps = a.resources.get(runtime.primitive.FpsCounter).?.fps;
+                const fps = a.time.fps.fps;
                 return std.fmt.bufPrint(buf, "FPS: {d:.0}", .{fps}) catch buf[0..0];
             }
         }.f,
@@ -174,12 +174,14 @@ fn resetSnake(app: *runtime.App) void {
     for (to_delete.items) |entity| {
         app.world.destroy(entity);
     }
+
+
     // spawn fresh snake
     spawnSnake(app);
 }
 
 fn updateLoop(app: *runtime.App) void {
-    const win = app.resources.getMut(runtime.platform.Window).?;
+    var win = app.window;
     const state = app.resources.getMut(GameState).?;
     if (state.* == .game_over) {
         if (win.isKeyPressed(.@"return")) {
@@ -197,35 +199,6 @@ fn updateLoop(app: *runtime.App) void {
         }
         return;
     }
-    // if (state.* == .game_over) {
-    //     if (win.isKeyPressed(.@"return")) {
-    //         state.* = .playing;
-    //         app.resources.getMut(Score).?.value = 0;
-    //         // reset head position and direction
-    //         var sq = app.world.view(.{ GridPos, SnakeHead }, .{});
-    //         var si = sq.entityIterator();
-    //         if (si.next()) |he| {
-    //             const hp = sq.get(GridPos, he);
-    //             const hd = sq.get(SnakeHead, he);
-    //             hp.x = 10;
-    //             hp.y = 10;
-    //             hd.dir_x = 1;
-    //             hd.dir_y = 0;
-    //             hd.next_dir_x = 1;
-    //             hd.next_dir_y = 0;
-    //             hd.move_timer = 0;
-    //         }
-    //         // reset food
-    //         var fq = app.world.view(.{ GridPos, Food }, .{});
-    //         var fi = fq.entityIterator();
-    //         if (fi.next()) |fe| {
-    //             const fp = fq.get(GridPos, fe);
-    //             fp.x = 15;
-    //             fp.y = 10;
-    //         }
-    //     }
-    //     return;
-    // }
 
     var query = app.world.view(.{SnakeHead}, .{});
     var iter = query.entityIterator();
@@ -309,9 +282,7 @@ fn updateSnake(app: *runtime.App) void {
     const state = app.resources.get(GameState).?;
     if (state.* == .game_over) return;
 
-    const time = app.resources.get(runtime.primitive.Time).?;
-    const dt: f32 = @floatCast(time.delta);
-
+    const dt: f32 = @floatCast(app.time.delta);
     var query = app.world.view(.{ GridPos, SnakeSegment, SnakeHead }, .{});
     var iter = query.entityIterator();
     const head_entity = iter.next() orelse return;
