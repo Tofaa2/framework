@@ -15,13 +15,11 @@ ibh: bgfx.IndexBufferHandle,
 num_vertices: u32,
 num_indices: u32,
 material: ?*Material = null,
-
-
-texture: ?*const Image = null,
+texture: Handle(Image) = .invalid,
 transform: ?math.Mat = null,
-owned_texture: ?Image = null,
+// owned_texture: ?Image = null,
 pub fn deinit(self: *Mesh) void {
     bgfx.destroyVertexBuffer(self.vbh);
     bgfx.destroyIndexBuffer(self.ibh);
-    if (self.owned_texture) |*tex| tex.deinit();
+    // if (self.owned_texture) |*tex| tex.deinit();
 }

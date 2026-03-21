@@ -3,6 +3,7 @@ const Vertex = @import("Vertex.zig");
 const MeshBuilder = @import("MeshBuilder.zig");
 const Color = @import("../primitive/Color.zig");
 const Image = @import("../primitive/Image.zig");
+const AssetPool = @import("../core/AssetPool.zig");
 
 const Material = struct {
     diffuse: Color,
@@ -10,7 +11,7 @@ const Material = struct {
 };
 
 pub const LoadResult = struct {
-    texture: ?Image = null,
+    texture: AssetPool.Handle(Image) = .invalid,
 };
 
 fn parseMtl(allocator: std.mem.Allocator, path: []const u8) !std.StringHashMap(Material) {
@@ -71,7 +72,7 @@ fn parseMtl(allocator: std.mem.Allocator, path: []const u8) !std.StringHashMap(M
     return map;
 }
 
-pub fn load(allocator: std.mem.Allocator, path: []const u8, builder: *MeshBuilder) !LoadResult {
+pub fn load(allocator: std.mem.Allocator, path: []const u8, builder: *MeshBuilder, asset: *AssetPool) !LoadResult {
     const file = try std.fs.cwd().openFile(path, .{});
     defer file.close();
 
@@ -100,7 +101,7 @@ pub fn load(allocator: std.mem.Allocator, path: []const u8, builder: *MeshBuilde
     }
 
     var current_color: Color = .white;
-    var current_texture: ?Image = null;
+    var current_texture: AssetPool.Handle(Image) = .invalid;
     var result = LoadResult{};
 
     var lines = std.mem.splitScalar(u8, content, '\n');
@@ -120,17 +121,13 @@ pub fn load(allocator: std.mem.Allocator, path: []const u8, builder: *MeshBuilde
                 current_color = mat.diffuse;
                 if (mat.diffuse_texture) |tex_name| {
                     const full_path = try std.fs.path.join(allocator, &.{ dir, tex_name });
-                    std.debug.print("loading texture: {s}\n", .{full_path});
                     defer allocator.free(full_path);
-                    current_texture = Image.initFile(full_path);
+                    // current_texture = Image.initFile(full_path);
+                    current_texture = try asset.loadImage(full_path);
                 }
-                // if (mat.diffuse_texture) |tex_name| {
-                //     const full_path = try std.fs.path.join(allocator, &.{ dir, tex_name });
-                //     defer allocator.free(full_path);
-                //     current_texture = Image.initFile(full_path);
-                // }
                 else {
-                    current_texture = null;
+                    // current_texture = null;
+                    current_texture = .invalid;
                 }
             }
         } else if (std.mem.startsWith(u8, trimmed, "v ")) {

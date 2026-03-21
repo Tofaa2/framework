@@ -192,7 +192,7 @@ pub const Renderer = struct {
         }
     }
 
-    pub fn draw(self: *Renderer) void {
+    pub fn draw(self: *Renderer, assets: *@import("../core/AssetPool.zig")) void {
         var iter = self.views.iterator();
         while (iter.next()) |entry| {
             const view = entry.value_ptr;
@@ -205,12 +205,12 @@ pub const Renderer = struct {
         iter = self.views.iterator();
         while (iter.next()) |entry| {
             const view = entry.value_ptr;
-            self.drawView(view);
+            self.drawView(view, assets);
         }
         _ = bgfx.frame(bgfx.FrameFlags_None);
     }
 
-    fn drawView(self: *Renderer, view: *View) void {
+    fn drawView(self: *Renderer, view: *View, assets: *@import("../core/AssetPool.zig")) void {
         const view_id: u8 = @intFromEnum(view.id);
 
         // static meshes
@@ -224,7 +224,8 @@ pub const Renderer = struct {
                 bgfx.StateFlags_WriteZ |
                 bgfx.StateFlags_DepthTestLess;
             bgfx.setState(state, 0);
-            if (mesh.owned_texture) |*tex| {
+            const owned_texture =  assets.getImage(mesh.texture);
+            if (owned_texture) |tex| {
                 bgfx.setTexture(0, self.tex_uniform, tex.handle, std.math.maxInt(u32));
                 mat.bindWithoutTexture();
             } else {
@@ -280,21 +281,6 @@ pub const Renderer = struct {
             } else {
                 bgfx.setTexture(0, self.tex_uniform, self.white_texture.handle, std.math.maxInt(u32));
             }
-            // if (sub.blend) {
-            //     const state = bgfx.StateFlags_WriteRgb |
-            //         bgfx.StateFlags_WriteA |
-            //         bgfx.StateFlags_BlendAlphaToCoverage;
-            //     bgfx.setState(state, 0);
-            // } else {
-            //     self.setState(sub.texture, false);
-            // }
-            // if (sub.blend) {
-            //         bgfx.setState(0x00000040000650ff, 0); // WriteRgb + WriteA + WriteZ + DepthTestLess + blend
-            //
-            //     // self.setState(sub.texture, true);
-            // } else {
-            //     self.setState(sub.texture, false);
-            // }
             var tvb: bgfx.TransientVertexBuffer = undefined;
             var tib: bgfx.TransientIndexBuffer = undefined;
             if (!bgfx.allocTransientBuffers(&tvb, &self.vertex_layout, @intCast(sub.vertices.len), &tib, @intCast(sub.indices.len), false)) {

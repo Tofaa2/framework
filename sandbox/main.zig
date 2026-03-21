@@ -21,11 +21,8 @@ pub fn main() !void {
     });
     defer application.deinit();
 
-    // const shinoa = try application.assets.loadImage("assets/shinoa.png");
 
     const font = try application.assets.loadFont("assets/Roboto-Regular.ttf", 32, 512);
-    // var font = runtime.primitive.Font.initFile("assets/Roboto-Regular.ttf", 32, 512);
-    // defer font.deinit();
     const camera_3d = runtime.primitive.Camera3D.init();
     application.resources.add(camera_3d) catch unreachable;
 
@@ -146,9 +143,10 @@ pub fn main() !void {
     var renderer = application.renderer;
     var obj_builder = runtime.renderer.MeshBuilder.init(allocator);
     defer obj_builder.deinit();
-    const result = try runtime.renderer.ObjLoader.load(allocator, "assets/animal-bunny.obj", &obj_builder);
+    const result = try runtime.renderer.ObjLoader.load(allocator, "assets/animal-bunny.obj", &obj_builder, &application.assets);
+    // const bunny_texture = try application.assets.loadAsset(runtime.primitive.Image, result.texture.?);
     var obj_mesh = obj_builder.buildMesh(&renderer.vertex_layout);
-    obj_mesh.owned_texture = result.texture; // add this line
+    obj_mesh.texture = result.texture; //result.texture; // add this line
     const mesh_entity = application.world.create();
     application.world.add(mesh_entity, runtime.primitive.Transform{
         .center = .{ 0.0, 0.0, 0.0 },

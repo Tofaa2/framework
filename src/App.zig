@@ -69,9 +69,10 @@ pub fn deinit(self: *Self) void {
     self.scheduler.run(self, .deinit);
     self.scheduler.deinit();
     self.world.deinit();
+
+    self.assets.deinit();
     self.renderer.deinit();
     self.allocators.generic.destroy(self.renderer);
-    self.assets.deinit();
     self.resources.deinit();
 }
 
@@ -97,7 +98,7 @@ pub fn run(self: *Self) void {
 
         self.scheduler.run(self, .render);
         self.renderPrimitive();
-        self.renderer.draw();
+        self.renderer.draw(&self.assets);
         self.time.enforceFpsLimit();
         _ = self.allocators.frame_arena.reset(.retain_capacity);
 

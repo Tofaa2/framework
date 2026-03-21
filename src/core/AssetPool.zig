@@ -4,6 +4,8 @@ const typeId = @import("../utils/type_id.zig").typeIdInt;
 
 pub const Image = @import("../primitive/Image.zig");
 pub const Font = @import("../primitive/Font.zig");
+pub const Mesh = @import("../renderer/Mesh.zig");
+pub const VertexLayout = @import("zbgfx").bgfx.VertexLayout;
 
 pub fn Handle(comptime T: type) type {
     _ = T;
@@ -33,8 +35,10 @@ pub fn deinit(self: *AssetManager) void {
     }
     self.stores.deinit();
 }
-
-// ─── Font ────────────────────────────────────────────────────────────────────
+//
+// pub fn loadObj(self: *AssetManager, path: []const u8, layout: VertexLayout) !Handle(Mesh) {
+//
+// }
 pub fn loadFont(self: *AssetManager, path: []const u8, size: f32, atlas_size: u32) !Handle(Font) {
     const font = Font.initFile(path, size, atlas_size);
     return self.loadAsset(Font, font);
