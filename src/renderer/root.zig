@@ -46,12 +46,13 @@ pub const Renderer = struct {
     }
 
     pub fn init(
+        self: *Renderer,
         allocator: std.mem.Allocator,
         viewport: Viewport,
         window_ptr: ?*anyopaque,
         display_ptr: ?*anyopaque,
         debug: bool,
-    ) !Renderer {
+    ) !void {
         var bgfx_init = std.mem.zeroes(bgfx.Init);
         bgfx.initCtor(&bgfx_init);
 
@@ -135,17 +136,24 @@ pub const Renderer = struct {
             .id = .ui,
             .allocator = allocator,
         }) catch unreachable;
-
-        return Renderer{
-            .allocator = allocator,
-            .viewport = viewport,
-            .unlit_program = unlit_program,
-            .white_texture = Image.initSingleColor(.white),
-            .vertex_layout = layout,
-            .views = views,
-            .tex_uniform = tex_uniform,
-            .materials = materials,
-        };
+        self.allocator = allocator;
+        self.viewport = viewport;
+        self.unlit_program = unlit_program;
+        self.white_texture = Image.initSingleColor(.white);
+        self.vertex_layout = layout;
+        self.views = views;
+        self.tex_uniform = tex_uniform;
+        self.materials = materials;
+        // return Renderer{
+        //     .allocator = allocator,
+        //     .viewport = viewport,
+        //     .unlit_program = unlit_program,
+        //     .white_texture = Image.initSingleColor(.white),
+        //     .vertex_layout = layout,
+        //     .views = views,
+        //     .tex_uniform = tex_uniform,
+        //     .materials = materials,
+        // };
     }
 
     pub fn resize(self: *Renderer, width: u32, height: u32) void {
@@ -163,6 +171,7 @@ pub const Renderer = struct {
                 1.0,
             );
         }
+  
         if (self.views.getPtr(.@"3d")) |v| {
             v.proj_mtx = zm.perspectiveFovRhGl(
                 0.25 * std.math.pi,

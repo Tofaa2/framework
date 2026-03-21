@@ -6,7 +6,7 @@ pub fn main() !void {
     // defer _ = gpa.deinit();
     const allocator = gpa.allocator();
 
-    var arena = std.heap.ArenaAllocator.init(std.heap.page_allocator);
+    var arena = std.heap.ArenaAllocator.init(allocator);
     defer arena.deinit();
     const arena_allocator = arena.allocator();
 
@@ -36,8 +36,7 @@ pub fn main() !void {
         .run = struct {
             fn f(app: *runtime.App) void {
                 const cam = app.resources.getMut(runtime.primitive.Camera3D) orelse return;
-                const renderer = app.resources.getMut(runtime.renderer.Renderer) orelse return;
-                renderer.getView(.@"3d").?.view_mtx = cam.getViewMatrix();
+                app.renderer.getView(.@"3d").?.view_mtx = cam.getViewMatrix();
             }
         }.f,
     }) catch unreachable;
@@ -144,12 +143,11 @@ pub fn main() !void {
     } });
 
     application.time.fps_limit = 165;
-    const renderer = application.resources.getMut(runtime.renderer.Renderer).?;
+    var renderer = application.renderer;
 
     var obj_builder = runtime.renderer.MeshBuilder.init(allocator);
     defer obj_builder.deinit();
     const result = try runtime.renderer.ObjLoader.load(allocator, "assets/animal-bunny.obj", &obj_builder);
-    std.debug.print("texture loaded: {}\n", .{result.texture != null});
     var obj_mesh = obj_builder.buildMesh(&renderer.vertex_layout);
     obj_mesh.owned_texture = result.texture; // add this line
     const mesh_entity = application.world.create();
@@ -174,6 +172,5 @@ pub fn main() !void {
 
 fn updateCamera2d(app: *runtime.App) void {
     const cam = app.resources.getMut(runtime.primitive.Camera2D) orelse return;
-    const renderer = app.resources.getMut(runtime.renderer.Renderer) orelse return;
-    renderer.getView(.@"2d").?.view_mtx = cam.getViewMatrix();
+    app.renderer.getView(.@"2d").?.view_mtx = cam.getViewMatrix();
 }
