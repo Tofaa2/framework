@@ -7,9 +7,6 @@ An opinionated, minimal game and application engine written in Zig.
 Framework is extremely bare-bones by design. The core principle is **everything is a resource** — from the window and renderer, to time and FPS counters. This gives you maximum flexibility and control over your application at the cost of verbosity.
  
 Something that takes a few button clicks in Unity might take 100 lines of code in Framework — and that's intentional. The goal isn't to minimize lines written, it's to give you full control over what happens and when. Down the line a scene editor will make common workflows less painful, but the low-level approach remains the foundation.
- 
-Primitives and components used across the codebase live in `src/primitive`. That's where you'll spend most of your time.
-
 
 
 ## Getting Started
@@ -51,13 +48,13 @@ pub fn main() !void {
  
     // spawn a red circle at 400, 300
     const circle = app.world.create();
-    app.world.add(circle, runtime.primitive.Transform{
+    app.world.add(circle, runtime.Transform{
         .center = .{ 400.0, 300.0, 0.0 },
     });
-    app.world.add(circle, runtime.primitive.Renderable{
+    app.world.add(circle, runtime.Renderable{
         .circle = .{ .radius = 50 },
     });
-    app.world.add(circle, runtime.primitive.Color.red);
+    app.world.add(circle, runtime.Color.red);
  
     // add an update system
     try app.scheduler.addStage(.{
@@ -70,10 +67,10 @@ pub fn main() !void {
 }
  
 fn mySystem(app: *runtime.App) void {
-    var query = app.world.view(.{ runtime.primitive.Transform, runtime.primitive.Renderable }, .{});
+    var query = app.world.view(.{ runtime.Transform, runtime.Renderable }, .{});
     var iter = query.entityIterator();
     while (iter.next()) |entity| {
-        const transform = query.get(runtime.primitive.Transform, entity);
+        const transform = query.get(runtime.Transform, entity);
         transform.center[0] += 1.0;
     }
 }

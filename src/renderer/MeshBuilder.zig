@@ -3,13 +3,13 @@ const Vertex = @import("Vertex.zig");
 const Mesh = @import("Mesh.zig");
 const DynamicMesh = @import("DynamicMesh.zig");
 const bgfx = @import("bgfx").bgfx;
-const Color = @import("../primitive/Color.zig");
+const Color = @import("../components/Color.zig");
 const math = @import("math.zig");
 const MeshBuilder = @This();
 const View = @import("View.zig");
 const ShaderProgram = @import("ShaderProgram.zig");
-const Image = @import("../primitive/Image.zig");
-const Font = @import("../primitive/Font.zig");
+const Image = @import("../assets/Image.zig");
+const Font = @import("../assets/Font.zig");
 
 allocator: std.mem.Allocator,
 vertices: std.ArrayList(Vertex),
@@ -118,14 +118,7 @@ pub fn pushText(self: *MeshBuilder, font: *const Font, text: []const u8, x: f32,
         const glyph = font.getGlyph(char) orelse continue;
         const x0 = cursor_x + glyph.x_offset;
         const x1 = x0 + glyph.width;
-        // const y0 = y - (glyph.y_offset + font.ascent);
-        // const y1 = y0 - glyph.height; // subtract instead of add
-        // self.pushQuad(
-        //     .init(.{ x0, y0, 0.0 }, color, .{ glyph.u0, glyph.v0 }),
-        //     .init(.{ x1, y0, 0.0 }, color, .{ glyph.u1, glyph.v0 }),
-        //     .init(.{ x1, y1, 0.0 }, color, .{ glyph.u1, glyph.v1 }),
-        //     .init(.{ x0, y1, 0.0 }, color, .{ glyph.u0, glyph.v1 }),
-        // );
+
         const y0 = y + glyph.y_offset + font.ascent;
         const y1 = y0 + glyph.height;
         self.pushQuad(
@@ -170,6 +163,28 @@ pub fn buildMesh(self: *MeshBuilder, layout: *const bgfx.VertexLayout) Mesh {
         .ibh = ibh,
         .num_vertices = @intCast(self.vertices.items.len),
         .num_indices = @intCast(self.indices.items.len),
+    };
+}
+
+pub fn buildFromSlices(
+    vertices: []const Vertex,
+    indices: []const u16,
+    layout: *const bgfx.VertexLayout,
+) Mesh {
+    const vbh = bgfx.createVertexBuffer(
+        bgfx.copy(vertices.ptr, @intCast(@sizeOf(Vertex) * vertices.len)),
+        layout,
+        bgfx.BufferFlags_None,
+    );
+    const ibh = bgfx.createIndexBuffer(
+        bgfx.copy(indices.ptr, @intCast(@sizeOf(u16) * indices.len)),
+        bgfx.BufferFlags_None,
+    );
+    return Mesh{
+        .vbh = vbh,
+        .ibh = ibh,
+        .num_vertices = @intCast(vertices.len),
+        .num_indices = @intCast(indices.len),
     };
 }
 

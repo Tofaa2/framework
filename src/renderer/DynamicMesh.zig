@@ -4,10 +4,10 @@
 const bgfx = @import("bgfx").bgfx;
 const Vertex = @import("Vertex.zig");
 const ShaderProgram = @import("ShaderProgram.zig");
-const Image = @import("../primitive/Image.zig");
+const Image = @import("../assets/Image.zig");
 const math = @import("math.zig");
 const DynamicMesh = @This();
-const Material = @import("Material.zig");
+const Material = @import("../assets/Material.zig");
 
 vbh: bgfx.DynamicVertexBufferHandle,
 ibh: bgfx.DynamicIndexBufferHandle,
@@ -17,6 +17,7 @@ texture: ?*const Image = null,
 material: ?*const Material = null,
 transform: ?math.Mat = null,
 owned_texture: ?Image = null,
+
 pub fn update(self: *DynamicMesh, vertices: []const Vertex, indices: []const u16) void {
     bgfx.updateDynamicVertexBuffer(self.vbh, 0, bgfx.copy(
         vertices.ptr,

@@ -1,5 +1,5 @@
 const std = @import("std");
-const c = @import("../core/c.zig").stb;
+const c = @import("../utils/stb_image.zig").c;
 const Image = @import("Image.zig");
 
 const Font = @This();

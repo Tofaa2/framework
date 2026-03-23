@@ -44,54 +44,44 @@ var fps_buf: [32]u8 = undefined;
 pub fn main() !void {
     var gpa = std.heap.GeneralPurposeAllocator(.{}){};
     defer _ = gpa.deinit();
-    const allocator = gpa.allocator();
+    const allocator = gpa.allocator(); // std.heap.c_allocator;
 
-    var arena = std.heap.ArenaAllocator.init(std.heap.page_allocator);
-    defer arena.deinit();
-    const arena_allocator = arena.allocator();
-
-    var app = runtime.App.init(.{
-        .name = "snake",
-        .allocators = .{
-            .frame = arena_allocator,
-            .generic = allocator,
-            .world = allocator,
-            .frame_arena = arena,
-        },
+    var app = try runtime.App.init(allocator, .{
+        .name = "Hello, World",
+        .width = 800,
+        .height = 600,
     });
     defer app.deinit();
 
-    // var font = runtime.primitive.Font.initFile("assets/Roboto-Regular.ttf", 32, 512);
-    // defer font.deinit();
     const font = try app.assets.loadFont("assets/Roboto-Regular.ttf", 32, 512);
 
-    common.setFPSMax(&app, 60);
+    common.setFPSMax(app, 60);
     try app.resources.add(Score{});
     try app.resources.add(GameState.playing);
 
     // grid background
     const grid_bg = app.world.create();
-    app.world.add(grid_bg, runtime.primitive.Transform{
+    app.world.add(grid_bg, runtime.Transform{
         .center = .{
             GRID_OFFSET_X + (GRID_W * CELL_SIZE) / 2.0,
             GRID_OFFSET_Y + (GRID_H * CELL_SIZE) / 2.0,
             0,
         },
     });
-    app.world.add(grid_bg, runtime.primitive.Renderable{ .rect = .{
+    app.world.add(grid_bg, runtime.Renderable{ .rect = .{
         .width = GRID_W * CELL_SIZE,
         .height = GRID_H * CELL_SIZE,
     } });
-    app.world.add(grid_bg, runtime.primitive.Color{ .r = 40, .g = 40, .b = 40, .a = 255 });
+    app.world.add(grid_bg, runtime.Color{ .r = 40, .g = 40, .b = 40, .a = 255 });
 
-    spawnSnake(&app);
-    spawnFood(&app);
+    spawnSnake(app);
+    spawnFood(app);
 
     // fps counter
     const fps_label = app.world.create();
-    app.world.add(fps_label, runtime.primitive.Transform{});
-    app.world.add(fps_label, runtime.primitive.Anchor{ .point = .top_right, .offset = .{ -150.0, 10.0 } });
-    app.world.add(fps_label, runtime.primitive.Renderable{ .fmt_text = .{
+    app.world.add(fps_label, runtime.Transform{});
+    app.world.add(fps_label, runtime.Anchor{ .point = .top_right, .offset = .{ -150.0, 10.0 } });
+    app.world.add(fps_label, runtime.Renderable{ .fmt_text = .{
         .font = font,
         .buf = &fps_buf,
         .format_fn = struct {
@@ -104,9 +94,9 @@ pub fn main() !void {
 
     // score counter
     const score_label = app.world.create();
-    app.world.add(score_label, runtime.primitive.Transform{});
-    app.world.add(score_label, runtime.primitive.Anchor{ .point = .top_left, .offset = .{ 10.0, 10.0 } });
-    app.world.add(score_label, runtime.primitive.Renderable{ .fmt_text = .{
+    app.world.add(score_label, runtime.Transform{});
+    app.world.add(score_label, runtime.Anchor{ .point = .top_left, .offset = .{ 10.0, 10.0 } });
+    app.world.add(score_label, runtime.Renderable{ .fmt_text = .{
         .font = font,
         .buf = &score_buf,
         .format_fn = struct {
@@ -119,9 +109,9 @@ pub fn main() !void {
 
     // game over label
     const game_over_label = app.world.create();
-    app.world.add(game_over_label, runtime.primitive.Transform{});
-    app.world.add(game_over_label, runtime.primitive.Anchor{ .point = .center, .offset = .{ -280.0, -20.0 } });
-    app.world.add(game_over_label, runtime.primitive.Renderable{ .fmt_text = .{
+    app.world.add(game_over_label, runtime.Transform{});
+    app.world.add(game_over_label, runtime.Anchor{ .point = .center, .offset = .{ -280.0, -20.0 } });
+    app.world.add(game_over_label, runtime.Renderable{ .fmt_text = .{
         .font = font,
         .buf = &game_over_buf,
         .format_fn = struct {
@@ -167,15 +157,14 @@ fn resetSnake(app: *runtime.App) void {
     // destroy all snake segments
     var query = app.world.view(.{SnakeSegment}, .{});
     var iter = query.entityIterator();
-    var to_delete = std.ArrayList(runtime.ecs.Entity).initCapacity(app.allocators.generic, 8) catch unreachable;
-    defer to_delete.deinit(app.allocators.generic);
+    var to_delete = std.ArrayList(runtime.ecs.Entity).initCapacity(app.allocator, 8) catch unreachable;
+    defer to_delete.deinit(app.allocator);
     while (iter.next()) |entity| {
-        to_delete.append(app.allocators.generic, entity) catch unreachable;
+        to_delete.append(app.allocator, entity) catch unreachable;
     }
     for (to_delete.items) |entity| {
         app.world.destroy(entity);
     }
-
 
     // spawn fresh snake
     spawnSnake(app);
@@ -228,41 +217,41 @@ fn spawnSnake(app: *runtime.App) void {
     const tail = app.world.create();
     app.world.add(tail, GridPos{ .x = 8, .y = 10 });
     app.world.add(tail, SnakeSegment{ .next = null });
-    app.world.add(tail, runtime.primitive.Transform{});
-    app.world.add(tail, runtime.primitive.Renderable{ .rect = .{ .width = CELL_SIZE - 2, .height = CELL_SIZE - 2 } });
-    app.world.add(tail, runtime.primitive.Color{ .r = 0, .g = 200, .b = 0, .a = 255 });
+    app.world.add(tail, runtime.Transform{});
+    app.world.add(tail, runtime.Renderable{ .rect = .{ .width = CELL_SIZE - 2, .height = CELL_SIZE - 2 } });
+    app.world.add(tail, runtime.Color{ .r = 0, .g = 200, .b = 0, .a = 255 });
 
     const mid = app.world.create();
     app.world.add(mid, GridPos{ .x = 9, .y = 10 });
     app.world.add(mid, SnakeSegment{ .next = tail });
-    app.world.add(mid, runtime.primitive.Transform{});
-    app.world.add(mid, runtime.primitive.Renderable{ .rect = .{ .width = CELL_SIZE - 2, .height = CELL_SIZE - 2 } });
-    app.world.add(mid, runtime.primitive.Color{ .r = 0, .g = 200, .b = 0, .a = 255 });
+    app.world.add(mid, runtime.Transform{});
+    app.world.add(mid, runtime.Renderable{ .rect = .{ .width = CELL_SIZE - 2, .height = CELL_SIZE - 2 } });
+    app.world.add(mid, runtime.Color{ .r = 0, .g = 200, .b = 0, .a = 255 });
 
     const head = app.world.create();
     app.world.add(head, GridPos{ .x = 10, .y = 10 });
     app.world.add(head, SnakeSegment{ .next = mid });
     app.world.add(head, SnakeHead{});
-    app.world.add(head, runtime.primitive.Transform{});
-    app.world.add(head, runtime.primitive.Renderable{ .rect = .{ .width = CELL_SIZE - 2, .height = CELL_SIZE - 2 } });
-    app.world.add(head, runtime.primitive.Color{ .r = 0, .g = 255, .b = 0, .a = 255 });
+    app.world.add(head, runtime.Transform{});
+    app.world.add(head, runtime.Renderable{ .rect = .{ .width = CELL_SIZE - 2, .height = CELL_SIZE - 2 } });
+    app.world.add(head, runtime.Color{ .r = 0, .g = 255, .b = 0, .a = 255 });
 }
 
 fn spawnFood(app: *runtime.App) void {
     const food = app.world.create();
     app.world.add(food, GridPos{ .x = 15, .y = 10 });
     app.world.add(food, Food{});
-    app.world.add(food, runtime.primitive.Transform{});
-    app.world.add(food, runtime.primitive.Renderable{ .rect = .{ .width = CELL_SIZE - 2, .height = CELL_SIZE - 2 } });
-    app.world.add(food, runtime.primitive.Color{ .r = 255, .g = 0, .b = 0, .a = 255 });
+    app.world.add(food, runtime.Transform{});
+    app.world.add(food, runtime.Renderable{ .rect = .{ .width = CELL_SIZE - 2, .height = CELL_SIZE - 2 } });
+    app.world.add(food, runtime.Color{ .r = 255, .g = 0, .b = 0, .a = 255 });
 }
 
 fn updateTransforms(app: *runtime.App) void {
-    var query = app.world.view(.{ GridPos, runtime.primitive.Transform }, .{});
+    var query = app.world.view(.{ GridPos, runtime.Transform }, .{});
     var iter = query.entityIterator();
     while (iter.next()) |entity| {
         const pos = query.getConst(GridPos, entity);
-        const transform = query.get(runtime.primitive.Transform, entity);
+        const transform = query.get(runtime.Transform, entity);
         const world = gridToWorld(pos.x, pos.y);
         transform.center[0] = world[0];
         transform.center[1] = world[1];
@@ -296,16 +285,16 @@ fn updateSnake(app: *runtime.App) void {
     head.dir_x = head.next_dir_x;
     head.dir_y = head.next_dir_y;
 
-    var segments = std.ArrayList(runtime.ecs.Entity).initCapacity(app.allocators.frame, 5) catch unreachable;
-    defer segments.deinit(app.allocators.frame);
+    var segments = std.ArrayList(runtime.ecs.Entity).initCapacity(app.frame_allocator.allocator(), 5) catch unreachable;
+    defer segments.deinit(app.frame_allocator.allocator());
 
     const head_pos = query.getConst(GridPos, head_entity);
     var seg_query = app.world.view(.{ GridPos, SnakeSegment }, .{});
 
-    segments.append(app.allocators.frame, head_entity) catch unreachable;
+    segments.append(app.frame_allocator.allocator(), head_entity) catch unreachable;
     var seg = query.getConst(SnakeSegment, head_entity);
     while (seg.next) |next| {
-        segments.append(app.allocators.frame, next) catch unreachable;
+        segments.append(app.frame_allocator.allocator(), next) catch unreachable;
         seg = seg_query.getConst(SnakeSegment, next);
     }
 
@@ -363,13 +352,12 @@ fn updateSnake(app: *runtime.App) void {
             const new_tail = app.world.create();
             app.world.add(new_tail, GridPos{ .x = tail_pos.x, .y = tail_pos.y });
             app.world.add(new_tail, SnakeSegment{ .next = null });
-            app.world.add(new_tail, runtime.primitive.Transform{});
-            app.world.add(new_tail, runtime.primitive.Renderable{ .rect = .{ .width = CELL_SIZE - 2, .height = CELL_SIZE - 2 } });
-            app.world.add(new_tail, runtime.primitive.Color{ .r = 0, .g = 200, .b = 0, .a = 255 });
+            app.world.add(new_tail, runtime.Transform{});
+            app.world.add(new_tail, runtime.Renderable{ .rect = .{ .width = CELL_SIZE - 2, .height = CELL_SIZE - 2 } });
+            app.world.add(new_tail, runtime.Color{ .r = 0, .g = 200, .b = 0, .a = 255 });
             tail_seg.next = new_tail;
 
             app.resources.getMut(Score).?.value += 1;
         }
     }
 }
-

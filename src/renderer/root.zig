@@ -7,20 +7,21 @@ const zm = math;
 var bgfx_clbs = zbgfx.callbacks.CCallbackInterfaceT{
     .vtable = &zbgfx.callbacks.DefaultZigCallbackVTable.toVtbl(),
 };
+const builtin = @import("builtin");
 
 pub const Viewport = @import("Viewport.zig");
-pub const Image = @import("../primitive/Image.zig");
+pub const Image = @import("../assets/Image.zig");
 pub const ShaderProgram = @import("ShaderProgram.zig");
 pub const log = std.log.scoped(.renderer);
 const isValid = @import("bgfx_util.zig").isValid;
-pub const Color = @import("../primitive/Color.zig");
+pub const Color = @import("../components/Color.zig");
 pub const View = @import("View.zig");
 pub const Vertex = @import("Vertex.zig");
 pub const MeshBuilder = @import("MeshBuilder.zig");
 pub const Mesh = @import("Mesh.zig");
 pub const DynamicMesh = @import("DynamicMesh.zig");
 pub const ObjLoader = @import("ObjLoader.zig");
-pub const Material = @import("Material.zig");
+pub const Material = @import("../assets/Material.zig");
 
 pub const BuiltinMaterial = enum {
     unlit,
@@ -51,7 +52,6 @@ pub const Renderer = struct {
         viewport: Viewport,
         window_ptr: ?*anyopaque,
         display_ptr: ?*anyopaque,
-        debug: bool,
     ) !void {
         var bgfx_init = std.mem.zeroes(bgfx.Init);
         bgfx.initCtor(&bgfx_init);
@@ -61,7 +61,7 @@ pub const Renderer = struct {
         bgfx_init.type = .Count;
         bgfx_init.resolution.width = viewport.width;
         bgfx_init.resolution.height = viewport.height;
-        bgfx_init.debug = debug;
+        bgfx_init.debug = builtin.mode == .Debug;
         bgfx_init.callback = &bgfx_clbs;
 
         if (!bgfx.init(&bgfx_init)) {
@@ -144,16 +144,6 @@ pub const Renderer = struct {
         self.views = views;
         self.tex_uniform = tex_uniform;
         self.materials = materials;
-        // return Renderer{
-        //     .allocator = allocator,
-        //     .viewport = viewport,
-        //     .unlit_program = unlit_program,
-        //     .white_texture = Image.initSingleColor(.white),
-        //     .vertex_layout = layout,
-        //     .views = views,
-        //     .tex_uniform = tex_uniform,
-        //     .materials = materials,
-        // };
     }
 
     pub fn resize(self: *Renderer, width: u32, height: u32) void {
@@ -171,7 +161,7 @@ pub const Renderer = struct {
                 1.0,
             );
         }
-  
+
         if (self.views.getPtr(.@"3d")) |v| {
             v.proj_mtx = zm.perspectiveFovRhGl(
                 0.25 * std.math.pi,
@@ -224,7 +214,7 @@ pub const Renderer = struct {
                 bgfx.StateFlags_WriteZ |
                 bgfx.StateFlags_DepthTestLess;
             bgfx.setState(state, 0);
-            const owned_texture =  assets.getImage(mesh.texture);
+            const owned_texture = assets.getAsset(@import("../assets/Image.zig"), mesh.texture);
             if (owned_texture) |tex| {
                 bgfx.setTexture(0, self.tex_uniform, tex.handle, std.math.maxInt(u32));
                 mat.bindWithoutTexture();
@@ -331,12 +321,13 @@ pub const Renderer = struct {
         }
         bgfx.destroyUniform(self.tex_uniform);
         bgfx.shutdown();
-        
+
         var view_iter = self.views.iterator();
         while (view_iter.next()) |entry| {
             entry.value_ptr.deinit();
         }
         self.views.deinit();
+        self.allocator.destroy(self);
     }
 };
 

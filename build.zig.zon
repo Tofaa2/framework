@@ -21,5 +21,9 @@
             .url = "git+https://github.com/prime31/zig-ecs/#dbf3647c2cc4f327fe87067e40f8436c7f87f209",
             .hash = "entt-1.0.0-qJPtbNLVAgDPXaUbyRSsBTK75Cr1WujUA92kToJugWry",
         },
+        .zaudio = .{
+            .url = "git+https://github.com/zig-gamedev/zaudio/#e5b89fde58be72de359089e9b8f5c4d5126fb159",
+            .hash = "zaudio-0.11.0-dev-_M-91uMxQQAWK02Oofoq8EFtqHwcSrJ-ISYEkcPJvViz",
+        },
     },
 }

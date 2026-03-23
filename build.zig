@@ -11,27 +11,7 @@ pub fn build(b: *Build) !void {
     const target = b.standardTargetOptions(.{});
     const optimize = b.standardOptimizeOption(.{ .preferred_optimize_mode = .Debug });
 
-    const thirdparty = b.addLibrary(.{ .name = "framework-thirdparty", .root_module = b.createModule(.{
-        .link_libc = true,
-        .root_source_file = b.path("thirdparty/root.zig"),
-        .optimize = optimize,
-        .target = target,
-    }) });
-    thirdparty.addIncludePath(b.path("thirdparty/"));
-    thirdparty.addCSourceFiles(.{
-        .files = &.{ "RGFW_Impl.c", "stb_truetype_impl.c", "microui.c" },
-        .root = b.path("thirdparty/"),
-    });
-    switch (target.result.os.tag) {
-        .windows => {
-            thirdparty.root_module.linkSystemLibrary("gdi32", .{ .needed = true });
-        },
-        .linux => {
-            thirdparty.root_module.linkSystemLibrary("X11", .{ .needed = true });
-            thirdparty.root_module.linkSystemLibrary("xrandr", .{ .needed = true });
-        },
-        else => {},
-    }
+    const thirdparty = buildThirdparty(b, target, optimize);
     const runtime = b.addModule("runtime", .{
         .link_libc = true,
         .link_libcpp = true,
@@ -42,6 +22,7 @@ pub fn build(b: *Build) !void {
     runtime.addImport("thirdparty", thirdparty.root_module);
     runtime.linkLibrary(thirdparty);
     linkSimpleModDep(b, runtime, "entt", "ecs", "zig-ecs");
+    linkSimpleModDep(b, runtime, "zaudio", "zaudio", "root");
     try linkBgfx(b, target, optimize, runtime);
     const sandbox = buildSandbox(b, target, optimize, &.{.{ .name = "runtime", .module = runtime }});
 
@@ -68,7 +49,8 @@ fn setupExamples(b: *std.Build, target: Target, optimize: Optimize, imports: Imp
 
     const names: []const Example = &.{
         .{ .name = "snake", .path = "examples/snake.zig" },
-        .{ .name = "basic", .path = "examples/basic.zig"},
+        .{ .name = "basic", .path = "examples/basic.zig" },
+        // .{ .name = "ui", .path = "examples/ui.zig" },
     };
 
     for (names) |example| {
@@ -90,6 +72,35 @@ fn setupExamples(b: *std.Build, target: Target, optimize: Optimize, imports: Imp
         const run_step = b.step(example.name, "Run an example");
         run_step.dependOn(&run_cmd.step);
     }
+}
+
+fn buildThirdparty(b: *Build, target: Target, optimize: Optimize) *Build.Step.Compile {
+    const thirdparty = b.addLibrary(.{ .name = "framework-thirdparty", .root_module = b.createModule(.{
+        .link_libc = true,
+        .root_source_file = b.path("thirdparty/root.zig"),
+        .optimize = optimize,
+        .target = target,
+    }) });
+    thirdparty.addIncludePath(b.path("thirdparty/"));
+    thirdparty.addCSourceFiles(.{
+        .files = &.{ "RGFW_Impl.c", "stb_truetype_impl.c", "microui.c", "miniaudio.c" },
+        .root = b.path("thirdparty/"),
+    });
+    switch (target.result.os.tag) {
+        .windows => {
+
+            // RGFW
+            thirdparty.root_module.linkSystemLibrary("gdi32", .{ .needed = true });
+        },
+        .linux => {
+
+            // RGFW
+            thirdparty.root_module.linkSystemLibrary("X11", .{ .needed = true });
+            thirdparty.root_module.linkSystemLibrary("xrandr", .{ .needed = true });
+        },
+        else => {},
+    }
+    return thirdparty;
 }
 
 fn buildSandbox(b: *Build, target: Target, optimize: Optimize, imports: Imports) *Build.Step.Compile {

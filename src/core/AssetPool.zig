@@ -1,14 +1,9 @@
 const std = @import("std");
-const AssetManager = @This();
+const AssetPool = @This();
 const typeId = @import("../utils/type_id.zig").typeIdInt;
-
-pub const Image = @import("../primitive/Image.zig");
-pub const Font = @import("../primitive/Font.zig");
-pub const Mesh = @import("../renderer/Mesh.zig");
-
-const MeshBuilder = @import("../renderer/MeshBuilder.zig");
+const root = @import("../root.zig");
 const VertexLayout = @import("bgfx").bgfx.VertexLayout;
-const ObjLoader = @import("../renderer/ObjLoader.zig");
+
 pub fn Handle(comptime T: type) type {
     _ = T;
     return struct {
@@ -23,97 +18,62 @@ pub fn Handle(comptime T: type) type {
 allocator: std.mem.Allocator,
 stores: std.AutoHashMap(usize, AssetStore),
 
-pub fn init(allocator: std.mem.Allocator) AssetManager {
-    return .{
+// loading utils
+
+pub fn loadSound(self: *AssetPool, path: [:0]const u8) !Handle(root.Sound) {
+    const sound = root.Sound.init(path);
+    return self.loadAsset(root.Sound, sound);
+}
+
+pub fn loadImage(self: *AssetPool, path: []const u8) !Handle(root.Image) {
+    const image = root.Image.initFile(path);
+    return self.loadAsset(root.Image, image);
+}
+
+pub fn loadFont(self: *AssetPool, path: []const u8, w: f32, size: u32) !Handle(root.Font) {
+    return self.loadAsset(root.Font, root.Font.initFile(path, w, size));
+}
+
+pub fn loadObj(self: *AssetPool, path: []const u8) !Handle(root.ObjLoader.Obj) {
+    const obj = try root.ObjLoader.load(self.allocator, path);
+    return self.loadAsset(root.ObjLoader.Obj, obj);
+}
+
+pub fn loadMesh(self: *AssetPool, path: []const u8, layout: *const @import("bgfx").bgfx.VertexLayout) !Handle(root.Mesh) {
+    var obj = try root.ObjLoader.load(self.allocator, path);
+    defer obj.deinit();
+
+    var builder = root.MeshBuilder.init(self.allocator);
+    defer builder.deinit();
+
+    var mesh = root.MeshBuilder.buildFromSlices(obj.vertices, obj.indices, layout);
+
+    if (obj.material.diffuse_texture_path) |tex_path| {
+        mesh.texture = try self.loadImage(tex_path);
+    }
+
+    return self.loadAsset(root.Mesh, mesh);
+}
+
+pub fn init(allocator: std.mem.Allocator) std.mem.Allocator.Error!*AssetPool {
+    const pool = try allocator.create(AssetPool);
+    pool.* = .{
         .allocator = allocator,
         .stores = std.AutoHashMap(usize, AssetStore).init(allocator),
     };
+    return pool;
 }
 
-pub fn deinit(self: *AssetManager) void {
+pub fn deinit(self: *AssetPool, allocator: std.mem.Allocator) void {
     var it = self.stores.iterator();
     while (it.next()) |entry| {
         entry.value_ptr.deinit(self.allocator);
     }
     self.stores.deinit();
+    allocator.destroy(self);
 }
 
-pub fn loadMesh(
-    self: *AssetManager,
-    allocator: std.mem.Allocator,
-    path: []const u8,
-    vertex_layout: *VertexLayout,
-) !Handle(Mesh) {
-    var builder = MeshBuilder.init(allocator);
-    defer builder.deinit();
-    const result = try ObjLoader.load(allocator, path, &builder, self);
-    var mesh = builder.buildMesh(vertex_layout);
-    mesh.texture= result.texture;
-    return self.loadAsset(Mesh, mesh);
-}
-
-pub fn getMesh(self: *AssetManager, handle: Handle(Mesh)) ?*Mesh {
-    return self.getAsset(Mesh, handle);
-}
-
-pub fn getMeshConst(self: *AssetManager, handle: Handle(Mesh)) ?*const Mesh {
-    return self.getAsset(Mesh, handle);
-}
-
-pub fn unloadMesh(self: *AssetManager, handle: Handle(Mesh)) void {
-    self.unloadAsset(Mesh, handle);
-}
-
-
-pub fn loadFont(self: *AssetManager, path: []const u8, size: f32, atlas_size: u32) !Handle(Font) {
-    const font = Font.initFile(path, size, atlas_size);
-    return self.loadAsset(Font, font);
-}
-
-pub fn getFont(self: *AssetManager, handle: Handle(Font)) ?*Font {
-    return self.getAsset(Font, handle);
-}
-
-pub fn getFontConst(self: *AssetManager, handle: Handle(Font)) ?*const Font {
-    return self.getAsset(Font, handle);
-}
-
-pub fn unloadFont(self: *AssetManager, handle: Handle(Font)) void {
-    self.unloadAsset(Font, handle);
-}
-
-pub fn retainFont(self: *AssetManager, handle: Handle(Font)) Handle(Font) {
-    return self.retainAsset(Font, handle);
-}
-
-
-pub fn loadImage(self: *AssetManager, path: []const u8) !Handle(Image) {
-    const image = Image.initFile(path);
-    return self.loadAsset(Image, image);
-}
-
-pub fn loadImageSingleColor(self: *AssetManager, color: Image.Color) !Handle(Image) {
-    const image = Image.initSingleColor(color);
-    return self.loadAsset(Image, image);
-}
-
-pub fn getImage(self: *AssetManager, handle: Handle(Image)) ?*Image {
-    return self.getAsset(Image, handle);
-}
-
-pub fn getImageConst(self: *AssetManager, handle: Handle(Image)) ?*const Image {
-    return self.getAsset(Image, handle);
-}
-
-pub fn unloadImage(self: *AssetManager, handle: Handle(Image)) void {
-    self.unloadAsset(Image, handle);
-}
-
-pub fn retainImage(self: *AssetManager, handle: Handle(Image)) Handle(Image) {
-    return self.retainAsset(Image, handle);
-}
-
-pub fn loadAsset(self: *AssetManager, comptime T: type, value: T) !Handle(T) {
+pub fn loadAsset(self: *AssetPool, comptime T: type, value: T) !Handle(T) {
     const store = try self.getOrCreateStore(T);
     const ptr = try self.allocator.create(T);
     ptr.* = value;
@@ -124,7 +84,9 @@ pub fn loadAsset(self: *AssetManager, comptime T: type, value: T) !Handle(T) {
         .deinitFn = struct {
             fn deinit(allocator: std.mem.Allocator, raw: *anyopaque) void {
                 const typed = @as(*T, @ptrCast(@alignCast(raw)));
-                typed.deinit();
+                if (@hasDecl(T, "deinit")) {
+                    typed.deinit();
+                }
                 allocator.destroy(typed);
             }
         }.deinit,
@@ -132,7 +94,7 @@ pub fn loadAsset(self: *AssetManager, comptime T: type, value: T) !Handle(T) {
     return Handle(T){ .id = index };
 }
 
-pub fn getAsset(self: *AssetManager, comptime T: type, handle: Handle(T)) ?*T {
+pub fn getAsset(self: *AssetPool, comptime T: type, handle: Handle(T)) ?*T {
     const store = self.getStore(T) orelse return null;
     if (handle.id >= store.entries.items.len) return null;
     const entry = &store.entries.items[handle.id];
@@ -140,7 +102,7 @@ pub fn getAsset(self: *AssetManager, comptime T: type, handle: Handle(T)) ?*T {
     return @as(*T, @ptrCast(@alignCast(entry.ptr)));
 }
 
-fn unloadAsset(self: *AssetManager, comptime T: type, handle: Handle(T)) void {
+fn unloadAsset(self: *AssetPool, comptime T: type, handle: Handle(T)) void {
     const store = self.getStore(T) orelse return;
     if (handle.id >= store.entries.items.len) return;
     const entry = &store.entries.items[handle.id];
@@ -152,14 +114,14 @@ fn unloadAsset(self: *AssetManager, comptime T: type, handle: Handle(T)) void {
     }
 }
 
-pub fn retainAsset(self: *AssetManager, comptime T: type, handle: Handle(T)) Handle(T) {
+pub fn retainAsset(self: *AssetPool, comptime T: type, handle: Handle(T)) Handle(T) {
     const store = self.getStore(T) orelse return handle;
     if (handle.id >= store.entries.items.len) return handle;
     store.entries.items[handle.id].ref_count += 1;
     return handle;
 }
 
-pub fn getOrCreateStore(self: *AssetManager, comptime T: type) !*AssetStore {
+pub fn getOrCreateStore(self: *AssetPool, comptime T: type) !*AssetStore {
     const id = typeId(T);
     const result = try self.stores.getOrPut(id);
     if (!result.found_existing) {
@@ -168,10 +130,9 @@ pub fn getOrCreateStore(self: *AssetManager, comptime T: type) !*AssetStore {
     return result.value_ptr;
 }
 
-pub fn getStore(self: *AssetManager, comptime T: type) ?*AssetStore {
+pub fn getStore(self: *AssetPool, comptime T: type) ?*AssetStore {
     return self.stores.getPtr(typeId(T));
 }
-
 
 pub const AssetEntry = struct {
     ptr: *anyopaque,

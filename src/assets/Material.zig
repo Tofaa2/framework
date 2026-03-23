@@ -1,7 +1,9 @@
+// TODO: Rework to support json based loading.
+
 const std = @import("std");
 const bgfx = @import("bgfx").bgfx;
-const ShaderProgram = @import("ShaderProgram.zig");
-const Image = @import("../primitive/Image.zig");
+const ShaderProgram = @import("../renderer/ShaderProgram.zig");
+const Image = @import("../assets/Image.zig");
 const Material = @This();
 
 pub const UniformValue = union(enum) {

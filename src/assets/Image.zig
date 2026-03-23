@@ -1,6 +1,6 @@
 const bgfx = @import("bgfx").bgfx;
-const c = @import("../core/c.zig").stb;
-const Color = @import("Color.zig");
+const c = @import("../utils/stb_image.zig").c;
+const Color = @import("../components/Color.zig");
 const std = @import("std");
 
 const Image = @This();

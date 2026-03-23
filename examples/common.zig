@@ -5,23 +5,17 @@ pub fn setFPSMax(application: *runtime.App, limit: ?u32) void {
     application.time.fps_limit = limit;
 }
 
-
-pub fn drawText(app: *runtime.App, font: *runtime.primitive.Font, content: []const u8, anchor: runtime.primitive.Anchor) void {
-
+pub fn drawText(app: *runtime.App, font: *runtime.Font, content: []const u8, anchor: runtime.Anchor) void {
     const entity = app.world.create();
-    app.world.add(entity, runtime.primitive.Transform {});
-    app.world.add(entity, runtime.primitive.Renderable {
-        .text = .{ .font = font, .content = content }
-    });
+    app.world.add(entity, runtime.Transform{});
+    app.world.add(entity, runtime.Renderable{ .text = .{ .font = font, .content = content } });
     app.world.add(entity, anchor);
-
 }
-pub fn drawFPS(app: *runtime.App, font: *runtime.primitive.Font, anchor: runtime.primitive.Anchor) void {
+pub fn drawFPS(app: *runtime.App, font: *runtime.Font, anchor: runtime.Anchor) void {
     const fps_label = app.world.create();
     var fps_buf: [64]u8 = undefined;
-    app.world.add(fps_label, runtime.primitive.Transform{
-    });
-    app.world.add(fps_label, runtime.primitive.Renderable{
+    app.world.add(fps_label, runtime.Transform{});
+    app.world.add(fps_label, runtime.Renderable{
         .fmt_text = .{
             .font = font,
             .buf = &fps_buf,
@@ -35,6 +29,5 @@ pub fn drawFPS(app: *runtime.App, font: *runtime.primitive.Font, anchor: runtime
     });
 
     app.world.add(fps_label, anchor);
-    app.world.add(fps_label, runtime.primitive.Color.red);
+    app.world.add(fps_label, runtime.Color.red);
 }
-

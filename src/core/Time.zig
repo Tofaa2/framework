@@ -33,7 +33,6 @@ pub fn update(self: *Self) void {
     const elapsed_ns = self.frame_timer.lap();
     self.delta = @as(f64, @floatFromInt(elapsed_ns)) / 1_000_000_000.0;
     self.fps.update(self.delta);
-    
 }
 
 pub fn enforceFpsLimit(self: *Self) void {

@@ -1,11 +1,11 @@
 const Self = @This();
 const std = @import("std");
 const math = @import("math.zig");
-const Color = @import("../primitive/Color.zig");
+const Color = @import("../components/Color.zig");
 const bgfx = @import("bgfx").bgfx;
 const Vertex = @import("Vertex.zig");
 const ShaderProgram = @import("ShaderProgram.zig");
-const Image = @import("../primitive/Image.zig");
+const Image = @import("../assets/Image.zig");
 const Mesh = @import("Mesh.zig");
 const DynamicMesh = @import("DynamicMesh.zig");
 
@@ -39,6 +39,10 @@ pub fn addDynamicMesh(self: *Self, mesh: *DynamicMesh) void {
 }
 
 pub fn deinit(self: *Self) void {
+    for (self.transient_submissions.items) |sub| {
+        self.allocator.free(sub.vertices);
+        self.allocator.free(sub.indices);
+    }
     self.transient_submissions.deinit(self.allocator);
     self.dynamic_meshes.deinit(self.allocator);
     self.meshes.deinit(self.allocator);

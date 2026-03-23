@@ -1,7 +1,7 @@
-const Image = @import("Image.zig");
-const Font = @import("Font.zig");
+const Image = @import("../assets/Image.zig");
+const Font = @import("../assets/Font.zig");
 const std = @import("std");
-const App = @import("../App.zig");
+const App = @import("../core/App.zig");
 const Mesh = @import("../renderer/Mesh.zig");
 const Handle = @import("../core/AssetPool.zig").Handle;
 pub const Renderable = union(enum) {

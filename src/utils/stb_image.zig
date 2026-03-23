@@ -1,7 +1,4 @@
-pub const c = @cImport({
-    @cInclude("stb_image.h");
-});
-
+pub const c = @import("thirdparty").stb;
 const std = @import("std");
 
 pub const Image = struct {

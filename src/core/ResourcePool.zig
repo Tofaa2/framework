@@ -1,27 +1,31 @@
 const std = @import("std");
-const Resources = @This();
+const ResourcePool = @This();
 const typeId = @import("../utils/type_id.zig").typeIdInt;
 
 allocator: std.mem.Allocator,
 map: std.AutoHashMap(usize, ResourceEntry),
 
-pub fn init(allocator: std.mem.Allocator) Resources {
-    return .{
+pub fn init(allocator: std.mem.Allocator) !*ResourcePool {
+    const self = try allocator.create(ResourcePool);
+    self.* = .{
         .allocator = allocator,
         .map = std.AutoHashMap(usize, ResourceEntry).init(allocator),
     };
+    return self;
 }
 
-pub fn deinit(self: *Resources) void {
+pub fn deinit(self: *ResourcePool) void {
     var it = self.map.iterator();
     while (it.next()) |entry| {
         entry.value_ptr.destroyFn(self.allocator, entry.value_ptr.ptr);
     }
     self.map.deinit();
+
+    self.allocator.destroy(self);
 }
 
 /// Add a resource by value (copied into pool)
-pub fn add(self: *Resources, value: anytype) !void {
+pub fn add(self: *ResourcePool, value: anytype) !void {
     const T = @TypeOf(value);
     const id = typeId(T);
     if (self.map.contains(id)) {
@@ -44,7 +48,7 @@ pub fn add(self: *Resources, value: anytype) !void {
 }
 
 /// Add a resource by pointer (takes ownership)
-pub fn addOwned(self: *Resources, comptime T: type, ptr: *T) !void {
+pub fn addOwned(self: *ResourcePool, comptime T: type, ptr: *T) !void {
     const id = typeId(T);
     if (self.map.contains(id)) {
         return error.ResourceAlreadyExists;
@@ -64,21 +68,21 @@ pub fn addOwned(self: *Resources, comptime T: type, ptr: *T) !void {
 }
 
 /// Immutable access
-pub fn get(self: *Resources, comptime T: type) ?*const T {
+pub fn get(self: *ResourcePool, comptime T: type) ?*const T {
     const id = typeId(T);
     const entry = self.map.get(id) orelse return null;
     return @as(*const T, @ptrCast(@alignCast(entry.ptr)));
 }
 
 /// Mutable access
-pub fn getMut(self: *Resources, comptime T: type) ?*T {
+pub fn getMut(self: *ResourcePool, comptime T: type) ?*T {
     const id = typeId(T);
     const entry = self.map.get(id) orelse return null;
     return @as(*T, @ptrCast(@alignCast(entry.ptr)));
 }
 
 /// Remove and destroy a resource
-pub fn remove(self: *Resources, comptime T: type) bool {
+pub fn remove(self: *ResourcePool, comptime T: type) bool {
     const id = typeId(T);
     const entry = self.map.fetchRemove(id) orelse return false;
     entry.value.destroyFn(self.allocator, entry.value.ptr);
@@ -86,7 +90,7 @@ pub fn remove(self: *Resources, comptime T: type) bool {
 }
 
 /// Check existence
-pub fn has(self: *Resources, comptime T: type) bool {
+pub fn has(self: *ResourcePool, comptime T: type) bool {
     return self.map.contains(typeId(T));
 }
 

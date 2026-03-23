@@ -1,12 +1,50 @@
-pub const utils = @import("utils/root.zig");
-pub const primitive = @import("primitive/root.zig");
-pub const renderer = @import("renderer/root.zig");
-pub const core = @import("core/root.zig");
-pub const platform = @import("platform/root.zig");
-pub const ecs = @import("ecs");
-pub const ui = @import("ui/root.zig");
+// core/
+pub const App = @import("core/App.zig");
+pub const Window = @import("core/Window.zig");
+pub const AssetPool = @import("core/AssetPool.zig");
+pub const Scheduler = @import("core/Scheduler.zig");
+pub const ResourcePool = @import("core/ResourcePool.zig");
+pub const Time = @import("core/Time.zig");
+pub const Keybinds = @import("core/Keybinds.zig");
+pub const Handle = AssetPool.Handle;
+pub const SoundManager = @import("core/SoundManager.zig");
+// assets/
+pub const AmbientLight = @import("assets/AmbientLight.zig");
+pub const Font = @import("assets/Font.zig");
+pub const Image = @import("assets/Image.zig");
+pub const Sound = @import("assets/Sound.zig");
+pub const Material = @import("assets/Material.zig");
 
-pub const App = @import("App.zig");
+// components/
+pub const Anchor = @import("components/Anchor.zig");
+pub const Camera2D = @import("components/Camera2D.zig");
+pub const Camera3D = @import("components/Camera3D.zig");
+pub const Color = @import("components/Color.zig");
+pub const Light = @import("components/Light.zig");
+pub const Renderable = @import("components/renderable.zig").Renderable;
+pub const Transform = @import("components/Transform.zig");
+pub const SoundSource = @import("components/SoundSource.zig");
+
+// renderer/
+pub const ShaderProgram = @import("renderer/ShaderProgram.zig");
+pub const Viewport = @import("renderer/Viewport.zig");
+pub const View = @import("renderer/View.zig");
+pub const Vertex = @import("renderer/Vertex.zig");
+pub const ObjLoader = @import("renderer/ObjLoader.zig");
+pub const Renderer = @import("renderer/root.zig").Renderer;
+pub const MeshBuilder = @import("renderer/MeshBuilder.zig");
+pub const Mesh = @import("renderer/Mesh.zig");
+pub const DynamicMesh = @import("renderer/DynamicMesh.zig");
+pub const rmath = @import("renderer/math.zig");
+
+// ecs/
+pub const ecs = @import("ecs");
+pub const World = ecs.Registry;
+
+// utils/
+pub const utils = @import("utils/root.zig");
+
+pub const thirdparty = @import("thirdparty");
 
 comptime {
     @import("std").testing.refAllDeclsRecursive(@This());
