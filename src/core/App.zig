@@ -20,7 +20,8 @@ scheduler: *Scheduler,
 resources: *ResourcePool,
 time: Time,
 renderer: *Renderer,
-world: ecs.Registry,
+world: *root.World,
+event: *root.EventManager,
 keybinds: *Keybinds,
 sounds: *SoundManager,
 allocator: std.mem.Allocator,
@@ -39,6 +40,7 @@ pub fn init(allocator: std.mem.Allocator, config: AppConfig) !*App {
     const renderer = try allocator.create(Renderer);
     const keybinds = try Keybinds.init(allocator);
     const sounds = try SoundManager.init(allocator);
+    const event = root.EventManager.init(allocator);
     try Renderer.init(
         renderer,
         allocator,
@@ -54,6 +56,7 @@ pub fn init(allocator: std.mem.Allocator, config: AppConfig) !*App {
     app.* = .{
         .name = config.name,
         .window = win,
+        .event = event,
         .assets = asset_pool,
         .scheduler = scheduler,
         .resources = resources,
@@ -61,7 +64,8 @@ pub fn init(allocator: std.mem.Allocator, config: AppConfig) !*App {
         .keybinds = keybinds,
         .running = false,
         .time = Time.init(),
-        .world = ecs.Registry.init(allocator),
+        // .world = ecs.Registry.init(allocator),
+        .world = root.World.init(allocator),
         .debug = builtin.mode == .Debug,
         .allocator = allocator,
         .frame_allocator = frame_allocator,
@@ -80,6 +84,7 @@ pub fn deinit(self: *App) void {
     self.world.deinit();
     self.keybinds.deinit();
     self.sounds.deinit();
+    self.event.deinit();
     self.allocator.destroy(self);
 }
 
@@ -111,8 +116,12 @@ pub fn run(self: *App) void {
         self.scheduler.run(self, .render);
         self.renderer.draw(self.assets);
 
+        self.world.scheduler.run(self.world);
+        self.event.dispatch(.update);
         self.time.enforceFpsLimit();
         self.running = !self.window.shouldClose();
+
+        self.frame_allocator.reset();
     }
 }
 fn updateSounds(self: *App) void {

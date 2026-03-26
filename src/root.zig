@@ -8,6 +8,11 @@ pub const Time = @import("core/Time.zig");
 pub const Keybinds = @import("core/Keybinds.zig");
 pub const Handle = AssetPool.Handle;
 pub const SoundManager = @import("core/SoundManager.zig");
+pub const World = @import("core/World.zig");
+pub const Event = @import("core/event.zig").Event;
+pub const GenericEventManager = @import("core/event.zig").GenericEventManager;
+pub const EventManager = @import("core/event.zig").EventManager;
+
 // assets/
 pub const AmbientLight = @import("assets/AmbientLight.zig");
 pub const Font = @import("assets/Font.zig");
@@ -39,7 +44,8 @@ pub const rmath = @import("renderer/math.zig");
 
 // ecs/
 pub const ecs = @import("ecs");
-pub const World = ecs.Registry;
+pub const Entity = ecs.Entity;
+// pub const World = ecs.Registry;
 
 // utils/
 pub const utils = @import("utils/root.zig");

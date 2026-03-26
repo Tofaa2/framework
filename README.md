@@ -8,7 +8,6 @@ Framework is extremely bare-bones by design. The core principle is **everything 
  
 Something that takes a few button clicks in Unity might take 100 lines of code in Framework — and that's intentional. The goal isn't to minimize lines written, it's to give you full control over what happens and when. Down the line a scene editor will make common workflows less painful, but the low-level approach remains the foundation.
 
-
 ## Getting Started
  
 ```bash
@@ -76,8 +75,14 @@ fn mySystem(app: *runtime.App) void {
 }
 ```
 
+# Tested Operating Systems
+- [x] Windows 11 x86-64
+- [x] Arch linux x86-64 (On wayland and gnome)
+- [ ] Macos  
 
 # Engine TODO
+
+MIGRATED TO BASKET (https://github.com/Tofaa2/basket)
 
 ## Renderer
 - [x] Restructure renderbatch and views to support proper optimizations for each type of renderable
@@ -146,12 +151,12 @@ fn mySystem(app: *runtime.App) void {
 - [ ] ECS serialization
 
 ## Audio
-- [ ] Audio system integration (miniaudio recommended)
-- [ ] Play/stop/pause sounds
-- [ ] Looping background music
+- [x] Audio system integration
+- [x] Play/stop/pause sounds
+- [x] Looping background music
 - [ ] 3D positional audio
-- [ ] Volume and pitch control
-- [ ] Audio as ECS component
+- [x] Volume and pitch control
+- [x] Audio as ECS component
 
 ## Physics
 - [ ] 2D AABB collision detection
@@ -191,4 +196,4 @@ fn mySystem(app: *runtime.App) void {
 - [ ] Asset manager with reference counting
 - [ ] Logging system with levels and categories
 - [ ] Profiling and performance counters
-- [x] Redo asset and resource approach completely, tighly couple specific areas (see #Structural Changes)
+- [x] Redo asset and resource approach completely, tighly couple specific areas

@@ -13,42 +13,6 @@ pub fn main() !void {
     });
     defer app.deinit();
 
-    app.time.fps_limit = 165;
-
-    const sound = try app.assets.loadSound("assets/boo.wav");
-    const s_source = app.world.create();
-    app.world.add(s_source, runtime.SoundSource{
-        .sound = sound,
-        .pitch = 3.0,
-        .volume = 2.0,
-        .looping = true,
-    });
-
-    app.run();
-}
-
-pub fn main1() !void {
-    const c = runtime.thirdparty.miniaudio;
-
-    var engine = std.mem.zeroes(c.ma_engine);
-    _ = c.ma_engine_init(null, &engine);
-    defer c.ma_engine_uninit(&engine);
-
-    _ = c.ma_engine_play_sound(&engine, "assets/boo.wav", null);
-}
-
-pub fn main0() !void {
-    var gpa = std.heap.GeneralPurposeAllocator(.{}){};
-    defer _ = gpa.deinit();
-    const allocator = gpa.allocator(); // std.heap.c_allocator;
-
-    var app = try runtime.App.init(allocator, .{
-        .name = "Hello, World",
-        .width = 800,
-        .height = 600,
-    });
-    defer app.deinit();
-
     const font = try app.assets.loadAsset(runtime.Font, runtime.Font.initFile("assets/Roboto-Regular.ttf", 32, 512));
 
     app.window.setMouseCaptured(true);
@@ -60,15 +24,30 @@ pub fn main0() !void {
     setupBinds(app.keybinds);
     setupCameraSystem(app);
 
-    var sound = try runtime.Sound.init(app.sounds.engine, "assets/boo.wav");
-    sound.play();
-
     var fps_buf: [64]u8 = undefined;
     createFpsLabel(app, font, fps_buf[0..]);
     createSun(app);
     createCircle(app);
     try createBunny(app);
     app.run();
+
+    try app.scheduler.addStage(.{
+        .name = "spin_bunny",
+        .phase = .update,
+        .run = struct {
+            fn func(appl: *runtime.App) void {
+                var iter = appl.world.basicView(Bunny).entityIterator();
+                while (iter.next()) |bunny_entity| {
+                    var transform = appl.world.get(runtime.Transform, bunny_entity);
+                    transform.rotation = .{
+                        transform.rotation[0] + 0.01,
+                        transform.rotation[1] + 0.01,
+                        transform.rotation[2] + 0.01,
+                    };
+                }
+            }
+        }.func,
+    });
 }
 
 fn createSun(app: *runtime.App) void {
@@ -182,6 +161,8 @@ fn createFpsLabel(app: *runtime.App, font: runtime.Handle(runtime.Font), fps_buf
     } });
 }
 
+pub const Bunny = struct {};
+
 fn createCircle(app: *runtime.App) void {
     const circle = app.world.create();
     app.world.add(circle, runtime.Transform{
@@ -193,6 +174,7 @@ fn createCircle(app: *runtime.App) void {
 fn createBunny(app: *runtime.App) !void {
     const bunny_mesh = try app.assets.loadMesh("assets/animal-bunny.obj", &app.renderer.vertex_layout);
     const mesh_entity = app.world.create();
+    app.world.add(mesh_entity, Bunny{});
     app.world.add(mesh_entity, runtime.Transform{
         .center = .{ 0.0, 0.0, 0.0 },
         .size = .{ 1.0, 1.0, 1.0 },
