@@ -34,8 +34,26 @@ pub fn addMesh(self: *Self, mesh: *Mesh) void {
     self.meshes.append(self.allocator, mesh) catch unreachable;
 }
 
+pub fn removeMesh(self: *Self, mesh: *Mesh) void {
+    for (self.meshes.items, 0..) |m, i| {
+        if (m == mesh) {
+            _ = self.meshes.swapRemove(i);
+            break;
+        }
+    }
+}
+
 pub fn addDynamicMesh(self: *Self, mesh: *DynamicMesh) void {
     self.dynamic_meshes.append(self.allocator, mesh) catch unreachable;
+}
+
+pub fn removeDynamicMesh(self: *Self, mesh: *DynamicMesh) void {
+    for (self.dynamic_meshes.items, 0..) |m, i| {
+        if (m == mesh) {
+            _ = self.dynamic_meshes.swapRemove(i);
+            break;
+        }
+    }
 }
 
 pub fn deinit(self: *Self) void {

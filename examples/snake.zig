@@ -126,23 +126,21 @@ pub fn main() !void {
         }.f,
     } });
 
-    try app.scheduler.addStage(.{
-        .name = "update-keyboard",
-        .phase = .update,
-        .run = updateLoop,
-    });
-    try app.scheduler.addStage(.{
-        .name = "update-transforms",
-        .phase = .update,
-        .run = updateTransforms,
-        .priority = 100,
-    });
-    try app.scheduler.addStage(.{
-        .name = "update-snake",
-        .phase = .update,
-        .run = updateSnake,
-        .priority = 80,
-    });
+    app.world.scheduler.buildSystem(updateLoop)
+        .reads(SnakeHead)
+        .reads(GridPos)
+        .reads(Food)
+        .append();
+    app.world.scheduler.buildSystem(updateTransforms)
+        .reads(GridPos)
+        .writes(runtime.Transform)
+        .append();
+    app.world.scheduler.buildSystem(updateSnake)
+        .reads(SnakeSegment)
+        .writes(SnakeHead)
+        .writes(GridPos)
+        .reads(Food)
+        .append();
 
     app.run();
 }
@@ -170,7 +168,8 @@ fn resetSnake(app: *runtime.App) void {
     spawnSnake(app);
 }
 
-fn updateLoop(app: *runtime.App) void {
+fn updateLoop(world: *runtime.World) void {
+    const app: *runtime.App = @ptrCast(@alignCast(world.ctx.?));
     var win = app.window;
     const state = app.resources.getMut(GameState).?;
     if (state.* == .game_over) {
@@ -246,15 +245,16 @@ fn spawnFood(app: *runtime.App) void {
     app.world.add(food, runtime.Color{ .r = 255, .g = 0, .b = 0, .a = 255 });
 }
 
-fn updateTransforms(app: *runtime.App) void {
+fn updateTransforms(world: *runtime.World) void {
+    const app: *runtime.App = @ptrCast(@alignCast(world.ctx.?));
     var query = app.world.view(.{ GridPos, runtime.Transform }, .{});
     var iter = query.entityIterator();
     while (iter.next()) |entity| {
         const pos = query.getConst(GridPos, entity);
         const transform = query.get(runtime.Transform, entity);
-        const world = gridToWorld(pos.x, pos.y);
-        transform.center[0] = world[0];
-        transform.center[1] = world[1];
+        const world_pos = gridToWorld(pos.x, pos.y);
+        transform.center[0] = world_pos[0];
+        transform.center[1] = world_pos[1];
     }
 }
 
@@ -268,7 +268,8 @@ fn isOccupiedBySnake(app: *runtime.App, x: i32, y: i32) bool {
     return false;
 }
 
-fn updateSnake(app: *runtime.App) void {
+fn updateSnake(world: *runtime.World) void {
+    const app: *runtime.App = @ptrCast(@alignCast(world.ctx.?));
     const state = app.resources.get(GameState).?;
     if (state.* == .game_over) return;
 

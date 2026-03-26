@@ -2,7 +2,6 @@
 pub const App = @import("core/App.zig");
 pub const Window = @import("core/Window.zig");
 pub const AssetPool = @import("core/AssetPool.zig");
-pub const Scheduler = @import("core/Scheduler.zig");
 pub const ResourcePool = @import("core/ResourcePool.zig");
 pub const Time = @import("core/Time.zig");
 pub const Keybinds = @import("core/Keybinds.zig");
@@ -12,6 +11,7 @@ pub const World = @import("core/World.zig");
 pub const Event = @import("core/event.zig").Event;
 pub const GenericEventManager = @import("core/event.zig").GenericEventManager;
 pub const EventManager = @import("core/event.zig").EventManager;
+pub const Plugin = @import("core/Plugin.zig").Plugin;
 
 // assets/
 pub const AmbientLight = @import("assets/AmbientLight.zig");
@@ -51,6 +51,10 @@ pub const Entity = ecs.Entity;
 pub const utils = @import("utils/root.zig");
 
 pub const thirdparty = @import("thirdparty");
+
+// systems/
+pub const RenderSystem = @import("systems/RenderSystem.zig");
+pub const AudioSystem = @import("systems/AudioSystem.zig");
 
 comptime {
     @import("std").testing.refAllDeclsRecursive(@This());

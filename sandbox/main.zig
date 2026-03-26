@@ -29,25 +29,25 @@ pub fn main() !void {
     createSun(app);
     createCircle(app);
     try createBunny(app);
-    app.run();
-
-    try app.scheduler.addStage(.{
-        .name = "spin_bunny",
-        .phase = .update,
-        .run = struct {
-            fn func(appl: *runtime.App) void {
-                var iter = appl.world.basicView(Bunny).entityIterator();
-                while (iter.next()) |bunny_entity| {
-                    var transform = appl.world.get(runtime.Transform, bunny_entity);
-                    transform.rotation = .{
-                        transform.rotation[0] + 0.01,
-                        transform.rotation[1] + 0.01,
-                        transform.rotation[2] + 0.01,
-                    };
-                }
+    
+    app.world.scheduler.buildSystem(struct {
+        fn func(world: *runtime.World) void {
+            const appl: *runtime.App = @ptrCast(@alignCast(world.ctx.?));
+            var iter = appl.world.basicView(Bunny).entityIterator();
+            while (iter.next()) |bunny_entity| {
+                var transform = appl.world.get(runtime.Transform, bunny_entity);
+                transform.rotation = .{
+                    transform.rotation[0] + 0.01,
+                    transform.rotation[1] + 0.01,
+                    transform.rotation[2] + 0.01,
+                };
             }
-        }.func,
-    });
+        }
+    }.func)
+    .writes(runtime.Transform)
+    .append();
+    
+    app.run();
 }
 
 fn createSun(app: *runtime.App) void {
@@ -110,30 +110,28 @@ fn setupBinds(binds: *runtime.Keybinds) void {
 }
 
 fn setupCameraSystem(application: *runtime.App) void {
-    application.scheduler.addStage(.{
-        .name = "camera_3d",
-        .phase = .update,
-        .priority = 80,
-        .run = struct {
-            fn f(app: *runtime.App) void {
-                app.renderer.getView(.@"3d").?.view_mtx = findCamera(app).?.getViewMatrix();
+    application.world.scheduler.buildSystem(struct {
+        fn f(world: *runtime.World) void {
+            const app: *runtime.App = @ptrCast(@alignCast(world.ctx.?));
+            app.renderer.getView(.@"3d").?.view_mtx = findCamera(app).?.getViewMatrix();
+        }
+    }.f)
+    .reads(runtime.Camera3D)
+    .writes(runtime.Transform)
+    .append();
+
+    application.world.scheduler.buildSystem(struct {
+        fn f(world: *runtime.World) void {
+            const app: *runtime.App = @ptrCast(@alignCast(world.ctx.?));
+            const cam = findCamera(app) orelse return;
+            const delta = app.window.getMouseDelta();
+            if (delta[0] != 0 or delta[1] != 0) {
+                cam.rotate(delta[0], delta[1]);
             }
-        }.f,
-    }) catch unreachable;
-    application.scheduler.addStage(.{
-        .name = "mouse_look",
-        .phase = .update,
-        .priority = 90,
-        .run = struct {
-            fn f(app: *runtime.App) void {
-                const cam = findCamera(app) orelse return;
-                const delta = app.window.getMouseDelta();
-                if (delta[0] != 0 or delta[1] != 0) {
-                    cam.rotate(delta[0], delta[1]);
-                }
-            }
-        }.f,
-    }) catch unreachable;
+        }
+    }.f)
+    .writes(runtime.Camera3D)
+    .append();
 }
 
 fn findCamera(app: *runtime.App) ?*runtime.Camera3D {

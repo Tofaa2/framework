@@ -8,6 +8,7 @@ registry: ecs.Registry,
 allocator: std.mem.Allocator,
 scheduler: *Scheduler,
 prefabs: std.StringHashMap(Prefab),
+ctx: ?*anyopaque = null,
 
 pub fn init(allocator: std.mem.Allocator) *World {
     const w = allocator.create(World) catch unreachable;
@@ -37,17 +38,17 @@ pub fn view(self: *World, comptime includes: anytype, comptime excludes: anytype
 
 pub fn addCreateSignal(self: *World, comptime T: type, func: SignalFunc) void {
     var assured = self.registry.assure(T);
-    assured.construction.calls.append(assured.construction.allocator, func);
+    assured.construction.calls.append(assured.construction.allocator, func) catch unreachable;
 }
 
 pub fn addDestroySignal(self: *World, comptime T: type, func: SignalFunc) void {
     var assured = self.registry.assure(T);
-    assured.destruction.calls.append(assured.destruction.allocator, func);
+    assured.destruction.calls.append(assured.destruction.allocator, func) catch unreachable;
 }
 
 pub fn addUpdateSignal(self: *World, comptime T: type, func: SignalFunc) void {
     var assured = self.registry.assure(T);
-    assured.update.calls.append(assured.update.allocator, func);
+    assured.update.calls.append(assured.update.allocator, func) catch unreachable;
 }
 
 pub fn add(self: *World, entity: Entity, value: anytype) void {
@@ -144,7 +145,7 @@ pub const Scheduler = struct {
     };
 
     pub const ComponentAccess = struct {
-        id: u32,
+        id: usize,
         access: Access,
     };
 
@@ -170,6 +171,37 @@ pub const Scheduler = struct {
                 }
             }
             return false;
+        }
+    };
+
+    pub const SystemBuilder = struct {
+        scheduler: *Scheduler,
+        func: SystemFn,
+        accesses: std.ArrayList(ComponentAccess),
+
+        pub fn reads(self: SystemBuilder, comptime T: type) SystemBuilder {
+            var m_self = self;
+            m_self.accesses.append(self.scheduler.allocator, .{ 
+                .id = @import("../utils/type_id.zig").typeIdInt(T), 
+                .access = .Read 
+            }) catch unreachable;
+            return m_self;
+        }
+
+        pub fn writes(self: SystemBuilder, comptime T: type) SystemBuilder {
+            var m_self = self;
+            m_self.accesses.append(self.scheduler.allocator, .{ 
+                .id = @import("../utils/type_id.zig").typeIdInt(T), 
+                .access = .Write 
+            }) catch unreachable;
+            return m_self;
+        }
+
+        pub fn append(self: SystemBuilder) void {
+            self.scheduler.append(.{
+                .func = self.func,
+                .accesses = self.accesses,
+            });
         }
     };
 
@@ -248,19 +280,30 @@ pub const Scheduler = struct {
     }
 
     fn runGroupParallel(self: *Scheduler, group: SystemGroup, world: *World) void {
-        for (group.systems.items, 0..) |sys, i| {
-            self.thread_pool.spawn(runSystem, .{ sys, world }) catch unreachable;
-            _ = i;
+        var wg = std.Thread.WaitGroup{};
+        for (group.systems.items) |sys| {
+            wg.start();
+            self.thread_pool.spawn(runSystemWg, .{ sys, world, &wg }) catch unreachable;
         }
+        wg.wait();
     }
 
-    fn runSystem(sys: System, world: *World) void {
+    fn runSystemWg(sys: System, world: *World, wg: *std.Thread.WaitGroup) void {
+        defer wg.finish();
         sys.func(world);
     }
 
     pub fn append(self: *Scheduler, system: System) void {
         self.systems.append(self.allocator, system) catch unreachable;
         self.dirty = true;
+    }
+
+    pub fn buildSystem(self: *Scheduler, func: SystemFn) SystemBuilder {
+        return SystemBuilder{
+            .scheduler = self,
+            .func = func,
+            .accesses = .empty,
+        };
     }
     fn visit(
         self: *Scheduler,

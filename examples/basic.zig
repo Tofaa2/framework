@@ -13,11 +13,14 @@ pub fn main() !void {
     });
     defer app.deinit();
 
+    app.addPlugin(runtime.RenderSystem.RenderPlugin);
+
     const circle = app.world.create();
     app.world.add(circle, runtime.Transform{});
     app.world.add(circle, runtime.Anchor{ .point = .center });
     app.world.add(circle, runtime.Renderable{
         .circle = .{ .radius = 100, .segments = 128 },
     });
+    
     app.run();
 }

@@ -289,8 +289,6 @@ pub const Renderer = struct {
             self.allocator.free(sub.vertices);
             self.allocator.free(sub.indices);
         }
-        view.meshes.clearRetainingCapacity();
-        view.dynamic_meshes.clearRetainingCapacity();
         view.transient_submissions.clearRetainingCapacity();
     }
 
