@@ -11,6 +11,8 @@ yaw: f32 = -std.math.pi / 2.0, // facing -Z by default
 pitch: f32 = 0.0,
 sensitivity: f32 = 0.002,
 pitch_clamp: f32 = std.math.pi / 2.0 - 0.01, // prevent gimbal lock
+fov: f32 = std.math.pi / 2.0, // 90 degrees
+
 pub fn init() Camera3D {
     var cam = Camera3D{
         .position = zm.f32x4(0.0, 0.0, -10.0, 1.0),
@@ -26,44 +28,51 @@ pub fn init() Camera3D {
     cam.rotate(0, 0);
     return cam;
 }
+
+pub fn forwardDir(self: *const Camera3D) zm.Vec {
+    return zm.normalize3(self.target - self.position);
+}
+
+pub fn rightDir(self: *const Camera3D) zm.Vec {
+    return zm.normalize3(zm.cross3(self.forwardDir(), self.up));
+}
+
 pub fn rotate(self: *Camera3D, dx: f32, dy: f32) void {
     self.yaw += dx * self.sensitivity;
-    self.pitch -= dy * self.sensitivity; // subtract because Y is flipped
+    self.pitch -= dy * self.sensitivity;
     self.pitch = std.math.clamp(self.pitch, -self.pitch_clamp, self.pitch_clamp);
-
-    const dir = zm.f32x4(
+    // recompute target from yaw/pitch relative to current position
+    const forward = zm.f32x4(
         @cos(self.pitch) * @cos(self.yaw),
         @sin(self.pitch),
         @cos(self.pitch) * @sin(self.yaw),
         0.0,
     );
-    self.target = self.position + dir;
-}
-pub fn getViewMatrix(self: Camera3D) zm.Mat {
-    return zm.lookAtRh(self.position, self.target, self.up);
+    self.target = self.position + forward;
 }
 
 pub fn moveForward(self: *Camera3D, dt: f32) void {
-    const dir = zm.normalize3(self.target - self.position);
-    const delta = dir * zm.splat(zm.Vec, self.speed * dt);
+    const delta = self.forwardDir() * zm.splat(zm.Vec, self.speed * dt);
     self.position += delta;
     self.target += delta;
 }
 
 pub fn moveBackward(self: *Camera3D, dt: f32) void {
-    self.moveForward(-dt);
-}
-
-pub fn moveRight(self: *Camera3D, dt: f32) void {
-    const dir = zm.normalize3(self.target - self.position);
-    const right = zm.normalize3(zm.cross3(dir, self.up));
-    const delta = right * zm.splat(zm.Vec, self.speed * dt);
-    self.position += delta;
-    self.target += delta;
+    const delta = self.forwardDir() * zm.splat(zm.Vec, self.speed * dt);
+    self.position -= delta;
+    self.target -= delta;
 }
 
 pub fn moveLeft(self: *Camera3D, dt: f32) void {
-    self.moveRight(-dt);
+    const delta = self.rightDir() * zm.splat(zm.Vec, self.speed * dt);
+    self.position -= delta;
+    self.target -= delta;
+}
+
+pub fn moveRight(self: *Camera3D, dt: f32) void {
+    const delta = self.rightDir() * zm.splat(zm.Vec, self.speed * dt);
+    self.position += delta;
+    self.target += delta;
 }
 
 pub fn moveUp(self: *Camera3D, dt: f32) void {
@@ -73,5 +82,20 @@ pub fn moveUp(self: *Camera3D, dt: f32) void {
 }
 
 pub fn moveDown(self: *Camera3D, dt: f32) void {
-    self.moveUp(-dt);
+    const delta = self.up * zm.splat(zm.Vec, self.speed * dt);
+    self.position -= delta;
+    self.target -= delta;
+}
+
+pub fn getViewMatrix(self: *const Camera3D) zm.Mat {
+    return zm.lookAtRh(self.position, self.target, self.up);
+}
+
+pub fn getProjectionMatrix(self: *const Camera3D, width: u32, height: u32) zm.Mat {
+    return zm.perspectiveFovRhGl(
+        self.fov,
+        @as(f32, @floatFromInt(width)) / @as(f32, @floatFromInt(height)),
+        0.1,
+        100.0,
+    );
 }

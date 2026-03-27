@@ -181,19 +181,13 @@ pub const Scheduler = struct {
 
         pub fn reads(self: SystemBuilder, comptime T: type) SystemBuilder {
             var m_self = self;
-            m_self.accesses.append(self.scheduler.allocator, .{ 
-                .id = @import("../utils/type_id.zig").typeIdInt(T), 
-                .access = .Read 
-            }) catch unreachable;
+            m_self.accesses.append(self.scheduler.allocator, .{ .id = @import("../utils/type_id.zig").typeIdInt(T), .access = .Read }) catch unreachable;
             return m_self;
         }
 
         pub fn writes(self: SystemBuilder, comptime T: type) SystemBuilder {
             var m_self = self;
-            m_self.accesses.append(self.scheduler.allocator, .{ 
-                .id = @import("../utils/type_id.zig").typeIdInt(T), 
-                .access = .Write 
-            }) catch unreachable;
+            m_self.accesses.append(self.scheduler.allocator, .{ .id = @import("../utils/type_id.zig").typeIdInt(T), .access = .Write }) catch unreachable;
             return m_self;
         }
 
@@ -227,8 +221,16 @@ pub const Scheduler = struct {
     pub fn deinit(self: *Scheduler) void {
         self.thread_pool.deinit();
         self.allocator.destroy(self.thread_pool);
+
+        for (self.systems.items) |*sys| {
+            sys.accesses.deinit(self.allocator);
+        }
+
         self.systems.deinit(self.allocator);
         self.execution_order.deinit(self.allocator);
+        for (self.groups.items) |*group| {
+            group.systems.deinit(self.allocator);
+        }
         self.groups.deinit(self.allocator);
         self.allocator.destroy(self);
     }
@@ -246,7 +248,9 @@ pub const Scheduler = struct {
 
     fn buildGroups(self: *Scheduler) void {
         self.groups.clearRetainingCapacity();
-
+        for (self.groups.items) |*group| {
+            group.systems.deinit(self.allocator);
+        }
         for (self.systems.items) |sys| {
             var placed = false;
 

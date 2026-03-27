@@ -146,6 +146,120 @@ pub fn pushLine(self: *MeshBuilder, x0: f32, y0: f32, x1: f32, y1: f32, thicknes
         .init(.{ x0 + nx, y0 + ny, 0.0 }, color, null),
     );
 }
+pub fn pushPlane(self: *MeshBuilder, cx: f32, cy: f32, cz: f32, size_x: f32, size_z: f32, color: Color) void {
+    const hx = size_x * 0.5;
+    const hz = size_z * 0.5;
+    const n: [3]f32 = .{ 0.0, 1.0, 0.0 }; // facing up
+    self.pushQuad(
+        .initWithNormal(.{ cx - hx, cy, cz + hz }, color, .{ 0.0, 0.0 }, n),
+        .initWithNormal(.{ cx + hx, cy, cz + hz }, color, .{ 1.0, 0.0 }, n),
+        .initWithNormal(.{ cx + hx, cy, cz - hz }, color, .{ 1.0, 1.0 }, n),
+        .initWithNormal(.{ cx - hx, cy, cz - hz }, color, .{ 0.0, 1.0 }, n),
+    );
+}
+
+pub fn pushCube(self: *MeshBuilder, cx: f32, cy: f32, cz: f32, size_x: f32, size_y: f32, size_z: f32, color: Color) void {
+    const hx = size_x * 0.5;
+    const hy = size_y * 0.5;
+    const hz = size_z * 0.5;
+
+    // Front face (+Z)
+    var n: [3]f32 = .{ 0.0, 0.0, 1.0 };
+    self.pushQuad(
+        .initWithNormal(.{ cx - hx, cy + hy, cz + hz }, color, .{ 0.0, 1.0 }, n),
+        .initWithNormal(.{ cx + hx, cy + hy, cz + hz }, color, .{ 1.0, 1.0 }, n),
+        .initWithNormal(.{ cx + hx, cy - hy, cz + hz }, color, .{ 1.0, 0.0 }, n),
+        .initWithNormal(.{ cx - hx, cy - hy, cz + hz }, color, .{ 0.0, 0.0 }, n),
+    );
+    // Back face (-Z)
+    n = .{ 0.0, 0.0, -1.0 };
+    self.pushQuad(
+        .initWithNormal(.{ cx + hx, cy + hy, cz - hz }, color, .{ 0.0, 1.0 }, n),
+        .initWithNormal(.{ cx - hx, cy + hy, cz - hz }, color, .{ 1.0, 1.0 }, n),
+        .initWithNormal(.{ cx - hx, cy - hy, cz - hz }, color, .{ 1.0, 0.0 }, n),
+        .initWithNormal(.{ cx + hx, cy - hy, cz - hz }, color, .{ 0.0, 0.0 }, n),
+    );
+    // Top face (+Y)
+    n = .{ 0.0, 1.0, 0.0 };
+    self.pushQuad(
+        .initWithNormal(.{ cx - hx, cy + hy, cz - hz }, color, .{ 0.0, 1.0 }, n),
+        .initWithNormal(.{ cx + hx, cy + hy, cz - hz }, color, .{ 1.0, 1.0 }, n),
+        .initWithNormal(.{ cx + hx, cy + hy, cz + hz }, color, .{ 1.0, 0.0 }, n),
+        .initWithNormal(.{ cx - hx, cy + hy, cz + hz }, color, .{ 0.0, 0.0 }, n),
+    );
+    // Bottom face (-Y)
+    n = .{ 0.0, -1.0, 0.0 };
+    self.pushQuad(
+        .initWithNormal(.{ cx - hx, cy - hy, cz + hz }, color, .{ 0.0, 1.0 }, n),
+        .initWithNormal(.{ cx + hx, cy - hy, cz + hz }, color, .{ 1.0, 1.0 }, n),
+        .initWithNormal(.{ cx + hx, cy - hy, cz - hz }, color, .{ 1.0, 0.0 }, n),
+        .initWithNormal(.{ cx - hx, cy - hy, cz - hz }, color, .{ 0.0, 0.0 }, n),
+    );
+    // Right face (+X)
+    n = .{ 1.0, 0.0, 0.0 };
+    self.pushQuad(
+        .initWithNormal(.{ cx + hx, cy + hy, cz + hz }, color, .{ 0.0, 1.0 }, n),
+        .initWithNormal(.{ cx + hx, cy + hy, cz - hz }, color, .{ 1.0, 1.0 }, n),
+        .initWithNormal(.{ cx + hx, cy - hy, cz - hz }, color, .{ 1.0, 0.0 }, n),
+        .initWithNormal(.{ cx + hx, cy - hy, cz + hz }, color, .{ 0.0, 0.0 }, n),
+    );
+    // Left face (-X)
+    n = .{ -1.0, 0.0, 0.0 };
+    self.pushQuad(
+        .initWithNormal(.{ cx - hx, cy + hy, cz - hz }, color, .{ 0.0, 1.0 }, n),
+        .initWithNormal(.{ cx - hx, cy + hy, cz + hz }, color, .{ 1.0, 1.0 }, n),
+        .initWithNormal(.{ cx - hx, cy - hy, cz + hz }, color, .{ 1.0, 0.0 }, n),
+        .initWithNormal(.{ cx - hx, cy - hy, cz - hz }, color, .{ 0.0, 0.0 }, n),
+    );
+}
+
+pub fn pushSphere(self: *MeshBuilder, cx: f32, cy: f32, cz: f32, radius: f32, rings: u32, slices: u32, color: Color) void {
+    const base = self.baseIdx();
+
+    var i: u32 = 0;
+    while (i <= rings) : (i += 1) {
+        const phi = (@as(f32, @floatFromInt(i)) / @as(f32, @floatFromInt(rings))) * std.math.pi;
+        const sin_phi = @sin(phi);
+        const cos_phi = @cos(phi);
+
+        var j: u32 = 0;
+        while (j <= slices) : (j += 1) {
+            const theta = (@as(f32, @floatFromInt(j)) / @as(f32, @floatFromInt(slices))) * std.math.tau;
+            const sin_theta = @sin(theta);
+            const cos_theta = @cos(theta);
+
+            const nx = sin_phi * cos_theta;
+            const ny = cos_phi;
+            const nz = sin_phi * sin_theta;
+
+            const x = cx + radius * nx;
+            const y = cy + radius * ny;
+            const z = cz + radius * nz;
+
+            const u = @as(f32, @floatFromInt(j)) / @as(f32, @floatFromInt(slices));
+            const v = @as(f32, @floatFromInt(i)) / @as(f32, @floatFromInt(rings));
+
+            self.pushVertex(.initWithNormal(.{ x, y, z }, color, .{ u, v }, .{ nx, ny, nz }));
+        }
+    }
+    // indices stay the same
+    i = 0;
+    while (i < rings) : (i += 1) {
+        var j: u32 = 0;
+        while (j < slices) : (j += 1) {
+            const next_i = i + 1;
+            const next_j = j + 1;
+
+            const p0 = base + @as(u16, @intCast(i * (slices + 1) + j));
+            const p1 = base + @as(u16, @intCast(i * (slices + 1) + next_j));
+            const p2 = base + @as(u16, @intCast(next_i * (slices + 1) + j));
+            const p3 = base + @as(u16, @intCast(next_i * (slices + 1) + next_j));
+
+            self.pushIndices(&.{ p0, p2, p1 });
+            self.pushIndices(&.{ p1, p2, p3 });
+        }
+    }
+}
 
 /// Builds a mesh from the vertices and indices stored in the builder.
 pub fn buildMesh(self: *MeshBuilder, layout: *const bgfx.VertexLayout) Mesh {

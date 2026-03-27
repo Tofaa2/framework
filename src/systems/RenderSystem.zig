@@ -134,7 +134,7 @@ fn plugin_build(app: *root.App) void {
 fn renderSystem(world: *root.World) void {
     const app: *root.App = @ptrCast(@alignCast(world.ctx.?));
     const renderer = app.renderer;
-    
+
     updateLights(world, renderer, app);
 
     var builder = root.MeshBuilder.init(app.allocator);

@@ -101,25 +101,25 @@ pub fn run(self: *App) void {
     }
     self.running = true;
     self.time.update();
+
+    var frames: usize = 0;
     while (self.running) {
+        frames += 1;
         self.time.update();
         self.window.update();
         if (self.window.resized_last_frame) {
             self.renderer.resize(self.window.width, self.window.height);
         }
         self.keybinds.update(self);
-        
-        self.world.scheduler.run(self.world);
 
+        self.world.scheduler.run(self.world);
         self.renderer.draw(self.assets);
         self.event.dispatch(.update);
         self.time.enforceFpsLimit();
         self.running = !self.window.shouldClose();
-
         self.frame_allocator.reset();
     }
 }
-
 
 pub const AppConfig = struct {
     name: []const u8,

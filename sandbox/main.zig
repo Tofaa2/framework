@@ -29,7 +29,31 @@ pub fn main() !void {
     createSun(app);
     createCircle(app);
     try createBunny(app);
-    
+
+    var mesh_builder = runtime.MeshBuilder.init(allocator);
+    defer mesh_builder.deinit();
+    mesh_builder.pushSphere(0.0, 0.0, 0.0, 1, 24, 24, .red);
+    const mesh = mesh_builder.buildMesh(&app.renderer.vertex_layout);
+    const mesh_handle = try app.assets.loadAsset(runtime.Mesh, mesh);
+
+    const cube_entity = app.world.create();
+    app.world.add(cube_entity, runtime.Transform{
+        .center = .{ 0.0, 10.0, 0.0 },
+    });
+    app.world.add(cube_entity, runtime.Renderable{ .mesh = .{ .mesh = mesh_handle } });
+
+    // // // center 0,0,0
+    // var t1 = runtime.Transform{ .center = .{ 0.0, 0.0, 0.0 } };
+    // const m1 = t1.toMatrix();
+    // std.debug.print("identity center matrix[3]: {d:.2} {d:.2} {d:.2} {d:.2}\n", .{ m1[3][0], m1[3][1], m1[3][2], m1[3][3] });
+
+    // // center 1,0,0
+    // var t2 = runtime.Transform{ .center = .{ 1.0, 0.0, 0.0 } };
+    // const m2 = t2.toMatrix();
+    // std.debug.print("offset center matrix[3]: {d:.2} {d:.2} {d:.2} {d:.2}\n", .{ m2[3][0], m2[3][1], m2[3][2], m2[3][3] });
+
+    // app.renderer.getView(.@"3d").?.addMesh(mesh_handle);
+
     app.world.scheduler.buildSystem(struct {
         fn func(world: *runtime.World) void {
             const appl: *runtime.App = @ptrCast(@alignCast(world.ctx.?));
@@ -44,9 +68,9 @@ pub fn main() !void {
             }
         }
     }.func)
-    .writes(runtime.Transform)
-    .append();
-    
+        .writes(runtime.Transform)
+        .append();
+
     app.run();
 }
 
@@ -113,12 +137,14 @@ fn setupCameraSystem(application: *runtime.App) void {
     application.world.scheduler.buildSystem(struct {
         fn f(world: *runtime.World) void {
             const app: *runtime.App = @ptrCast(@alignCast(world.ctx.?));
-            app.renderer.getView(.@"3d").?.view_mtx = findCamera(app).?.getViewMatrix();
+            var camera = findCamera(app) orelse return;
+            app.renderer.getView(.@"3d").?.view_mtx = camera.getViewMatrix();
+            app.renderer.getView(.@"3d").?.proj_mtx = camera.getProjectionMatrix(app.renderer.viewport.width, app.renderer.viewport.height);
         }
     }.f)
-    .reads(runtime.Camera3D)
-    .writes(runtime.Transform)
-    .append();
+        .reads(runtime.Camera3D)
+        .writes(runtime.Transform)
+        .append();
 
     application.world.scheduler.buildSystem(struct {
         fn f(world: *runtime.World) void {
@@ -130,8 +156,8 @@ fn setupCameraSystem(application: *runtime.App) void {
             }
         }
     }.f)
-    .writes(runtime.Camera3D)
-    .append();
+        .writes(runtime.Camera3D)
+        .append();
 }
 
 fn findCamera(app: *runtime.App) ?*runtime.Camera3D {

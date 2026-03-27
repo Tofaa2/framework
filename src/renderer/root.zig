@@ -205,9 +205,11 @@ pub const Renderer = struct {
 
         // static meshes
         for (view.meshes.items) |mesh| {
-            if (mesh.transform) |t| {
-                _ = bgfx.setTransform(&math.matToArr(zm.transpose(t)), 1);
-            }
+            const transform_mat = if (mesh.transform) |t| t else math.identity();
+
+            const arr = math.matToArr(transform_mat); // no transpose
+            _ = bgfx.setTransform(&arr, 1);
+
             const mat = if (mesh.material) |m| m else self.materials.getPtr(.unlit).?;
             const state = bgfx.StateFlags_WriteRgb |
                 bgfx.StateFlags_WriteA |
