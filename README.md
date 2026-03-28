@@ -4,7 +4,7 @@ An opinionated, minimal game and application engine written in Zig.
  
 ## Philosophy
  
-Framework is extremely bare-bones by design. The core principle is **everything is a resource** — from the window and renderer, to time and FPS counters. This gives you maximum flexibility and control over your application at the cost of verbosity.
+Framework is extremely bare-bones by design. This gives you maximum flexibility and control over your application at the cost of verbosity.
  
 Something that takes a few button clicks in Unity might take 100 lines of code in Framework — and that's intentional. The goal isn't to minimize lines written, it's to give you full control over what happens and when. Down the line a scene editor will make common workflows less painful, but the low-level approach remains the foundation.
 
