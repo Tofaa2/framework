@@ -71,6 +71,7 @@ pub fn init(allocator: std.mem.Allocator, config: AppConfig) !*App {
 
     app.addPlugin(root.RenderSystem.RenderPlugin);
     app.addPlugin(root.AudioSystem.AudioPlugin);
+    app.addPlugin(root.PhysicsSystem.PhysicsPlugin);
 
     return app;
 }
@@ -102,9 +103,7 @@ pub fn run(self: *App) void {
     self.running = true;
     self.time.update();
 
-    var frames: usize = 0;
     while (self.running) {
-        frames += 1;
         self.time.update();
         self.window.update();
         if (self.window.resized_last_frame) {

@@ -29,6 +29,9 @@ pub const Light = @import("components/Light.zig");
 pub const Renderable = @import("components/renderable.zig").Renderable;
 pub const Transform = @import("components/Transform.zig");
 pub const SoundSource = @import("components/SoundSource.zig");
+pub const Gravity = @import("components/Gravity.zig");
+pub const RigidBody = @import("components/RigidBody.zig");
+pub const Collider = @import("components/Collider.zig");
 
 // renderer/
 pub const ShaderProgram = @import("renderer/ShaderProgram.zig");
@@ -55,6 +58,7 @@ pub const thirdparty = @import("thirdparty");
 // systems/
 pub const RenderSystem = @import("systems/RenderSystem.zig");
 pub const AudioSystem = @import("systems/AudioSystem.zig");
+pub const PhysicsSystem = @import("systems/PhysicsSystem.zig");
 
 comptime {
     @import("std").testing.refAllDeclsRecursive(@This());

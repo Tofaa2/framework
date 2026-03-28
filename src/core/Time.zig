@@ -7,6 +7,7 @@ fps_limit: ?u32 = null,
 timer: std.time.Timer,
 frame_timer: std.time.Timer,
 fps: FpsCounter = .{},
+current_frame: u512 = 0,
 
 pub const FpsCounter = struct {
     samples: [60]f64 = [_]f64{0.016} ** 60,
@@ -33,6 +34,7 @@ pub fn update(self: *Self) void {
     const elapsed_ns = self.frame_timer.lap();
     self.delta = @as(f64, @floatFromInt(elapsed_ns)) / 1_000_000_000.0;
     self.fps.update(self.delta);
+    self.current_frame += 1;
 }
 
 pub fn enforceFpsLimit(self: *Self) void {

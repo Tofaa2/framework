@@ -38,7 +38,7 @@ pub fn main() !void {
 
     const cube_entity = app.world.create();
     app.world.add(cube_entity, runtime.Transform{
-        .center = .{ 0.0, 10.0, 0.0 },
+        .center = .{ 4.0, 0.0, 0.0 },
     });
     app.world.add(cube_entity, runtime.Renderable{ .mesh = .{ .mesh = mesh_handle } });
 
