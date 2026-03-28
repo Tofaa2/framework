@@ -12,24 +12,44 @@ const SoundManager = @import("SoundManager.zig");
 
 const root = @import("../root.zig");
 
+/// The name of the app, used for logging and window title.
 name: []const u8,
+/// The pointer to the Window struct thats used for window management.
 window: *Window,
+/// The pointer to the AssetPool struct thats used for managing assets (Meshes, Fonts, etc).
 assets: *AssetPool,
+/// The pointer to the ResourcePool struct thats used for managing resources (Game state, etc).
 resources: *ResourcePool,
+/// The time struct thats used for tracking start time, delta, frame count, frame time and others.
 time: Time,
+/// The pointer to the Renderer struct thats used for rendering the scene.
+/// Can be used to access the renderer's viewport, materials, and other rendering properties.
+/// This can be used to supply meshes and other render primitives directly to the renderer without having to use the entity component system.
 renderer: *Renderer,
+/// The pointer to the World struct thats used for managing entities and their components.
 world: *root.World,
+/// The pointer to the EventManager struct thats used for managing events. WIP.
 event: *root.EventManager,
+/// The pointer to the app lived keybinds. This is a higher level abstraction over the raw keyboard data.
 keybinds: *Keybinds,
+/// The pointer to the SoundManager struct thats used for managing sounds.
 sounds: *SoundManager,
+/// The allocator used for heap allocations throughout the App. Hot spots per frame are allocated from the frame pool, not this one.
 allocator: std.mem.Allocator,
 
-    frame_pool: []u8, // 6mb
-    frame_allocator: std.heap.FixedBufferAllocator,
+/// Raw frame pool. Defaults to 6mb.
+frame_pool: []u8, // 6mb
+/// The backend allocator for the frame pool.
+frame_allocator: std.heap.FixedBufferAllocator,
 
+/// Whether debug mode is enabled.
 debug: bool,
+/// Whether the app is currently running.
 running: bool,
 
+/// Initialize an application with a given root allocator and a configuration.
+/// This will heap allocate the app struct and its internal components.
+/// Call run to start the application loop after initialization is successful.
 pub fn init(allocator: std.mem.Allocator, config: AppConfig) !*App {
     const win = try Window.init(allocator, config.name, config.width, config.height);
     const asset_pool = try AssetPool.init(allocator);
@@ -76,6 +96,7 @@ pub fn init(allocator: std.mem.Allocator, config: AppConfig) !*App {
     return app;
 }
 
+/// Deinitialize the application and free all resources.
 pub fn deinit(self: *App) void {
     self.window.deinit(self.allocator);
     self.assets.deinit(self.allocator);
@@ -89,14 +110,20 @@ pub fn deinit(self: *App) void {
     self.allocator.destroy(self);
 }
 
+/// Very primitive "plugin" system for adding functionality to the App.
+/// Foundational plugins can be found in the root module (root.RenderSystem, root.AudioSystem, root.PhysicsSystem).
 pub fn addPlugin(self: *App, plugin: root.Plugin) void {
     plugin.build(self);
 }
 
+/// Get the frame allocator for the application.
+/// This is the preferred way to do per-frame short lived allocations
+/// Such as allocating formattable text.
 pub fn getFrameAllocator(self: *App) std.mem.Allocator {
     return self.frame_allocator.allocator();
 }
 
+/// Run the application. This function is blocking until App#running is set to false.
 pub fn run(self: *App) void {
     if (self.running) {
         std.log.err("App {s} is already running!\n", .{self.name});
@@ -125,13 +152,22 @@ pub fn run(self: *App) void {
     }
 }
 
+/// App configuration struct, this is used to configure the app on initialization.
 pub const AppConfig = struct {
+    /// The name of the app, used for logging and window title.
     name: []const u8,
+    /// The base width of the app window. This also sets the framebuffer width.
     width: u32,
+    /// The base height of the app window. This also sets the framebuffer height.
     height: u32,
 };
+
+/// App initialization error type.
 pub const AppError = error{
+    /// Failed to initialize the window.
     WindowInitFailed,
+    /// Failed to allocate the App struct and its internals.
     OutOfMemory,
+    /// Failed to initialize the assets.
     AssetInitFailed,
 };
