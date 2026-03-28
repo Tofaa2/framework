@@ -32,6 +32,7 @@ pub const SoundSource = @import("components/SoundSource.zig");
 pub const Gravity = @import("components/Gravity.zig");
 pub const RigidBody = @import("components/RigidBody.zig");
 pub const Collider = @import("components/Collider.zig");
+pub const Velocity = @import("components/Velocity.zig");
 
 // renderer/
 pub const ShaderProgram = @import("renderer/ShaderProgram.zig");

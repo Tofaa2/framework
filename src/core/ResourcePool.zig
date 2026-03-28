@@ -41,6 +41,7 @@ pub fn add(self: *ResourcePool, value: anytype) !void {
                 raw: *anyopaque,
             ) void {
                 const typed = @as(*T, @ptrCast(@alignCast(raw)));
+                if (@hasDecl(T, "deinit")) typed.deinit();
                 allocator.destroy(typed);
             }
         }.destroy,
@@ -61,6 +62,7 @@ pub fn addOwned(self: *ResourcePool, comptime T: type, ptr: *T) !void {
                 raw: *anyopaque,
             ) void {
                 const typed = @as(*T, @ptrCast(@alignCast(raw)));
+                if (@hasDecl(T, "deinit")) typed.deinit();
                 allocator.destroy(typed);
             }
         }.destroy,

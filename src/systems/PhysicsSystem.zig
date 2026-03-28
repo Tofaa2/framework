@@ -47,20 +47,23 @@ fn plugin_build(app: *root.App) void {
 
     app.world.scheduler.buildSystem(applyGravity)
         .reads(root.Gravity)
+        .writes(root.Velocity)
         .writes(root.RigidBody)
         .inPhase(.pre_update)
         .append();
 
     app.world.scheduler.buildSystem(integrateVelocity)
+        .reads(root.RigidBody)
         .writes(root.Transform)
-        .writes(root.RigidBody)
+        .writes(root.Velocity)
         .inPhase(.update)
         .append();
 
     app.world.scheduler.buildSystem(detectAndResolveCollisions)
         .reads(root.Collider)
+        .reads(root.RigidBody)
         .writes(root.Transform)
-        .writes(root.RigidBody)
+        .writes(root.Velocity)
         .writes(CollisionEvents)
         .inPhase(.post_update)
         .append();
@@ -75,15 +78,17 @@ fn applyGravity(world: *root.World) void {
     const app: *root.App = @ptrCast(@alignCast(world.ctx.?));
     const dt: f32 = @floatCast(app.time.delta);
 
-    var query = world.view(.{ root.RigidBody, root.Gravity }, .{});
+    var query = world.view(.{ root.Gravity, root.Velocity }, .{});
     var iter = query.entityIterator();
     while (iter.next()) |entity| {
-        const body = query.get(root.RigidBody, entity);
-        if (body.is_static) continue;
+        if (world.tryGetConst(root.RigidBody, entity)) |body| {
+            if (body.is_static) continue;
+        }
         const gravity = query.getConst(root.Gravity, entity);
-        body.velocity[0] += gravity.acceleration[0] * dt;
-        body.velocity[1] += gravity.acceleration[1] * dt;
-        body.velocity[2] += gravity.acceleration[2] * dt;
+        var vel = query.get(root.Velocity, entity);
+        vel.value[0] += gravity.acceleration[0] * dt;
+        vel.value[1] += gravity.acceleration[1] * dt;
+        vel.value[2] += gravity.acceleration[2] * dt;
     }
 }
 
@@ -91,22 +96,34 @@ fn integrateVelocity(world: *root.World) void {
     const app: *root.App = @ptrCast(@alignCast(world.ctx.?));
     const dt: f32 = @floatCast(app.time.delta);
 
-    var query = world.view(.{ root.Transform, root.RigidBody }, .{});
+    // Apply drag if RigidBody is present
+    var drag_query = world.view(.{ root.RigidBody, root.Velocity }, .{});
+    var drag_iter = drag_query.entityIterator();
+    while (drag_iter.next()) |entity| {
+        const body = drag_query.getConst(root.RigidBody, entity);
+        if (body.is_static) continue;
+        var vel = drag_query.get(root.Velocity, entity);
+
+        const drag_factor = @max(0.0, 1.0 - body.drag * dt);
+        vel.value[0] *= drag_factor;
+        vel.value[1] *= drag_factor;
+        vel.value[2] *= drag_factor;
+    }
+
+    // Integrate velocity into transform for ALL moving objects
+    var query = world.view(.{ root.Transform, root.Velocity }, .{});
     var iter = query.entityIterator();
     while (iter.next()) |entity| {
-        const body = query.get(root.RigidBody, entity);
-        if (body.is_static) continue;
+        if (world.tryGetConst(root.RigidBody, entity)) |body| {
+             if (body.is_static) continue;
+        }
+        
         const transform = query.get(root.Transform, entity);
+        const vel = query.getConst(root.Velocity, entity);
 
-        // Exponential drag
-        const drag_factor = @max(0.0, 1.0 - body.drag * dt);
-        body.velocity[0] *= drag_factor;
-        body.velocity[1] *= drag_factor;
-        body.velocity[2] *= drag_factor;
-
-        transform.center[0] += body.velocity[0] * dt;
-        transform.center[1] += body.velocity[1] * dt;
-        transform.center[2] += body.velocity[2] * dt;
+        transform.center[0] += vel.value[0] * dt;
+        transform.center[1] += vel.value[1] * dt;
+        transform.center[2] += vel.value[2] * dt;
     }
 }
 
@@ -208,16 +225,16 @@ fn resolveCollision(
     b: *const CollidableEntry,
     result: TestResult,
 ) void {
-    const body_a = if (!a.is_static) world.tryGet(root.RigidBody, a.entity) else null;
-    const body_b = if (!b.is_static) world.tryGet(root.RigidBody, b.entity) else null;
+    const body_a = world.tryGet(root.RigidBody, a.entity);
+    const body_b = world.tryGet(root.RigidBody, b.entity);
     const transform_a = if (!a.is_static) world.tryGet(root.Transform, a.entity) else null;
     const transform_b = if (!b.is_static) world.tryGet(root.Transform, b.entity) else null;
 
     const n = result.normal;
     const pen = result.penetration;
 
-    const inv_mass_a: f32 = if (body_a) |ba| 1.0 / ba.mass else 0.0;
-    const inv_mass_b: f32 = if (body_b) |bb| 1.0 / bb.mass else 0.0;
+    const inv_mass_a: f32 = if (body_a) |ba| (if (!a.is_static) 1.0 / ba.mass else 0.0) else 0.0;
+    const inv_mass_b: f32 = if (body_b) |bb| (if (!b.is_static) 1.0 / bb.mass else 0.0) else 0.0;
     const total_inv_mass = inv_mass_a + inv_mass_b;
     if (total_inv_mass == 0) return;
 
@@ -235,12 +252,14 @@ fn resolveCollision(
     }
 
     // Impulse-based velocity resolution along the normal
-    const vel_a: [3]f32 = if (body_a) |ba| ba.velocity else .{ 0, 0, 0 };
-    const vel_b: [3]f32 = if (body_b) |bb| bb.velocity else .{ 0, 0, 0 };
+    const vel_a = if (!a.is_static) world.tryGet(root.Velocity, a.entity) else null;
+    const vel_b = if (!b.is_static) world.tryGet(root.Velocity, b.entity) else null;
+    const va: [3]f32 = if (vel_a) |va_| va_.value else .{ 0, 0, 0 };
+    const vb: [3]f32 = if (vel_b) |vb_| vb_.value else .{ 0, 0, 0 };
     const rel_vel_n =
-        (vel_a[0] - vel_b[0]) * n[0] +
-        (vel_a[1] - vel_b[1]) * n[1] +
-        (vel_a[2] - vel_b[2]) * n[2];
+        (va[0] - vb[0]) * n[0] +
+        (va[1] - vb[1]) * n[1] +
+        (va[2] - vb[2]) * n[2];
 
     // Only resolve if approaching
     if (rel_vel_n > 0) return;
@@ -251,14 +270,14 @@ fn resolveCollision(
     );
     const impulse = -(1.0 + e) * rel_vel_n / total_inv_mass;
 
-    if (body_a) |ba| {
-        ba.velocity[0] += impulse * inv_mass_a * n[0];
-        ba.velocity[1] += impulse * inv_mass_a * n[1];
-        ba.velocity[2] += impulse * inv_mass_a * n[2];
+    if (vel_a) |va_| {
+        va_.value[0] += impulse * inv_mass_a * n[0];
+        va_.value[1] += impulse * inv_mass_a * n[1];
+        va_.value[2] += impulse * inv_mass_a * n[2];
     }
-    if (body_b) |bb| {
-        bb.velocity[0] -= impulse * inv_mass_b * n[0];
-        bb.velocity[1] -= impulse * inv_mass_b * n[1];
-        bb.velocity[2] -= impulse * inv_mass_b * n[2];
+    if (vel_b) |vb_| {
+        vb_.value[0] -= impulse * inv_mass_b * n[0];
+        vb_.value[1] -= impulse * inv_mass_b * n[1];
+        vb_.value[2] -= impulse * inv_mass_b * n[2];
     }
 }

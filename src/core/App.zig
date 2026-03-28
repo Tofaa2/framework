@@ -24,8 +24,8 @@ keybinds: *Keybinds,
 sounds: *SoundManager,
 allocator: std.mem.Allocator,
 
-frame_pool: [1024 * 1024 * 6]u8, // 6mb
-frame_allocator: std.heap.FixedBufferAllocator,
+    frame_pool: []u8, // 6mb
+    frame_allocator: std.heap.FixedBufferAllocator,
 
 debug: bool,
 running: bool,
@@ -46,8 +46,8 @@ pub fn init(allocator: std.mem.Allocator, config: AppConfig) !*App {
         win.getNativeNdt(),
     );
 
-    var frame_pool: [1024 * 1024 * 6]u8 = undefined;
-    const frame_allocator = std.heap.FixedBufferAllocator.init(&frame_pool);
+    const frame_pool = try allocator.alloc(u8, 1024 * 1024 * 6);
+    const frame_allocator = std.heap.FixedBufferAllocator.init(frame_pool);
 
     const app = try allocator.create(App);
     app.* = .{
@@ -81,6 +81,7 @@ pub fn deinit(self: *App) void {
     self.assets.deinit(self.allocator);
     self.renderer.deinit();
     self.resources.deinit();
+    self.allocator.free(self.frame_pool);
     self.world.deinit();
     self.keybinds.deinit();
     self.sounds.deinit();
@@ -90,6 +91,10 @@ pub fn deinit(self: *App) void {
 
 pub fn addPlugin(self: *App, plugin: root.Plugin) void {
     plugin.build(self);
+}
+
+pub fn getFrameAllocator(self: *App) std.mem.Allocator {
+    return self.frame_allocator.allocator();
 }
 
 pub fn run(self: *App) void {

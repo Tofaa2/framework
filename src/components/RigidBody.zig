@@ -1,6 +1,6 @@
 /// A dynamic physics body. Add to any entity you want physics to affect.
 /// Works in both 2D (set Z components to 0) and 3D.
-velocity: [3]f32 = .{ 0.0, 0.0, 0.0 },
+/// Works in both 2D (set Z components to 0) and 3D.
 /// If true, this body does not move but still participates in collision detection.
 is_static: bool = false,
 mass: f32 = 1.0,
