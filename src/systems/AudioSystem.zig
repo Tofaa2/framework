@@ -6,6 +6,7 @@ pub const AudioPlugin = root.Plugin.init(plugin_build);
 fn plugin_build(app: *root.App) void {
     app.world.scheduler.buildSystem(updateSounds)
         .writes(root.SoundSource)
+        .inPhase(.update)
         .append();
 }
 

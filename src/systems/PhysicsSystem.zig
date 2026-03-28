@@ -41,26 +41,28 @@ fn plugin_build(app: *root.App) void {
     app.resources.add(CollisionEvents.init(app.allocator)) catch {};
 
     app.world.scheduler.buildSystem(clearCollisionEvents)
-        // .inPhase(.pre_update)
+        .writes(CollisionEvents)
+        .inPhase(.pre_update)
         .append();
 
     app.world.scheduler.buildSystem(applyGravity)
         .reads(root.Gravity)
         .writes(root.RigidBody)
-        // .inPhase(.pre_update)
+        .inPhase(.pre_update)
         .append();
 
     app.world.scheduler.buildSystem(integrateVelocity)
         .writes(root.Transform)
         .writes(root.RigidBody)
-        // .inPhase(.update)
+        .inPhase(.update)
         .append();
 
     app.world.scheduler.buildSystem(detectAndResolveCollisions)
         .reads(root.Collider)
-        .reads(root.Transform)
+        .writes(root.Transform)
         .writes(root.RigidBody)
-        // .inPhase(.post_update)
+        .writes(CollisionEvents)
+        .inPhase(.post_update)
         .append();
 }
 

@@ -9,6 +9,11 @@ const Image = @import("../assets/Image.zig");
 const Mesh = @import("Mesh.zig");
 const DynamicMesh = @import("DynamicMesh.zig");
 
+pub const RenderCommand = struct {
+    mesh: *Mesh,
+    transform: math.Mat,
+};
+
 pub const Map = std.AutoArrayHashMap(Id, Self);
 
 pub const Id = enum(u8) {
@@ -25,23 +30,12 @@ clear_color: Color = .black,
 clear_flags: u16 = bgfx.ClearFlags_Color | bgfx.ClearFlags_Depth,
 
 transient_submissions: std.ArrayList(TransientSubmission) = .empty,
-meshes: std.ArrayList(*Mesh) = .empty,
+render_commands: std.ArrayList(RenderCommand) = .empty,
 dynamic_meshes: std.ArrayList(*DynamicMesh) = .empty,
 
 allocator: std.mem.Allocator,
 
-pub fn addMesh(self: *Self, mesh: *Mesh) void {
-    self.meshes.append(self.allocator, mesh) catch unreachable;
-}
-
-pub fn removeMesh(self: *Self, mesh: *Mesh) void {
-    for (self.meshes.items, 0..) |m, i| {
-        if (m == mesh) {
-            _ = self.meshes.swapRemove(i);
-            break;
-        }
-    }
-}
+    // Replaced meshes with per-frame render_commands
 
 pub fn addDynamicMesh(self: *Self, mesh: *DynamicMesh) void {
     self.dynamic_meshes.append(self.allocator, mesh) catch unreachable;
@@ -63,7 +57,7 @@ pub fn deinit(self: *Self) void {
     }
     self.transient_submissions.deinit(self.allocator);
     self.dynamic_meshes.deinit(self.allocator);
-    self.meshes.deinit(self.allocator);
+    self.render_commands.deinit(self.allocator);
 }
 
 pub const TransientSubmission = struct {

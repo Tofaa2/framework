@@ -203,11 +203,10 @@ pub const Renderer = struct {
     fn drawView(self: *Renderer, view: *View, assets: *@import("../core/AssetPool.zig")) void {
         const view_id: u8 = @intFromEnum(view.id);
 
-        // static meshes
-        for (view.meshes.items) |mesh| {
-            const transform_mat = if (mesh.transform) |t| t else math.identity();
-
-            const arr = math.matToArr(transform_mat); // no transpose
+        // dynamic meshes via render commands (ECS rendering)
+        for (view.render_commands.items) |cmd| {
+            const mesh = cmd.mesh;
+            const arr = math.matToArr(cmd.transform); // no transpose needed, row-major math
             _ = bgfx.setTransform(&arr, 1);
 
             const mat = if (mesh.material) |m| m else self.materials.getPtr(.unlit).?;

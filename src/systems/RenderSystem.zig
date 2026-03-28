@@ -100,6 +100,9 @@ fn render2D(world: *root.World, builder: *root.MeshBuilder, app: *root.App) void
 }
 
 fn render3D(world: *root.World, app: *root.App) void {
+    const view_3d = app.renderer.getView(.@"3d") orelse return;
+    view_3d.render_commands.clearRetainingCapacity();
+
     var query = world.view(.{ root.Transform, root.Renderable }, .{});
     var iter = query.entityIterator();
 
@@ -109,7 +112,13 @@ fn render3D(world: *root.World, app: *root.App) void {
         switch (renderable) {
             .mesh => |m| {
                 if (app.assets.getAsset(root.Mesh, m.mesh)) |mesh| {
-                    mesh.transform = transform.toMatrix();
+                    if (mesh.material == null) {
+                        mesh.material = app.renderer.getMaterial(.diffuse);
+                    }
+                    view_3d.render_commands.append(view_3d.allocator, .{
+                        .mesh = mesh,
+                        .transform = transform.toMatrix(),
+                    }) catch unreachable;
                 }
             },
             else => {},
@@ -127,8 +136,8 @@ fn plugin_build(app: *root.App) void {
         .reads(root.Anchor)
         .reads(root.Color)
         .reads(root.AmbientLight)
+        .inPhase(.render)
         .append();
-    init(app.world);
 }
 
 fn renderSystem(world: *root.World) void {
@@ -144,42 +153,4 @@ fn renderSystem(world: *root.World) void {
     render3D(world, app);
 }
 
-fn init(world: *root.World) void {
-    world.addCreateSignal(root.Renderable, root.World.SignalFunc.initFree(onRenderableAdd));
-    world.addDestroySignal(root.Renderable, root.World.SignalFunc.initFree(onRenderableRemove));
-}
 
-fn onRenderableAdd(registry: *root.ecs.Registry, entity: root.ecs.Entity) void {
-    const world: *root.World = @fieldParentPtr("registry", registry);
-    const app: *root.App = @ptrCast(@alignCast(world.ctx.?));
-    if (world.tryGetConst(root.Renderable, entity)) |renderable| {
-        switch (renderable) {
-            .mesh => |m| {
-                if (app.assets.getAsset(root.Mesh, m.mesh)) |mesh| {
-                    const view_3d = app.renderer.getView(.@"3d").?;
-                    if (mesh.material == null) {
-                        mesh.material = app.renderer.getMaterial(.diffuse);
-                    }
-                    view_3d.addMesh(mesh);
-                }
-            },
-            else => {},
-        }
-    }
-}
-
-fn onRenderableRemove(registry: *root.ecs.Registry, entity: root.ecs.Entity) void {
-    const world: *root.World = @fieldParentPtr("registry", registry);
-    const app: *root.App = @ptrCast(@alignCast(world.ctx.?));
-    if (world.tryGetConst(root.Renderable, entity)) |renderable| {
-        switch (renderable) {
-            .mesh => |m| {
-                if (app.assets.getAsset(root.Mesh, m.mesh)) |mesh| {
-                    const view_3d = app.renderer.getView(.@"3d").?;
-                    view_3d.removeMesh(mesh);
-                }
-            },
-            else => {},
-        }
-    }
-}

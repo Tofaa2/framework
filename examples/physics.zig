@@ -29,12 +29,18 @@ pub fn main() !void {
 
     const bunny_mesh = try app.assets.loadMesh("assets/animal-bunny.obj", &app.renderer.vertex_layout);
 
+    var builder = runtime.MeshBuilder.init(allocator);
+    builder.pushCube(0.0, 0.0, 0.0, 1.0, 1.0, 1.0, runtime.Color.white);
+    const floor_mesh_raw = builder.buildMesh(&app.renderer.vertex_layout);
+    const floor_mesh_handle = try app.assets.loadAsset(runtime.Mesh, floor_mesh_raw);
+    builder.deinit();
+
     const floor = app.world.create();
     app.world.add(floor, runtime.Transform{
         .center = .{ 0.0, -2.0, 0.0 },
         .size = .{ 20.0, 0.5, 20.0 },
     });
-    app.world.add(floor, runtime.Renderable{ .mesh = .{ .mesh = bunny_mesh } });
+    app.world.add(floor, runtime.Renderable{ .mesh = .{ .mesh = floor_mesh_handle } });
     app.world.add(floor, runtime.RigidBody{ .is_static = true });
     // Use a large AABB for the floor
     app.world.add(floor, runtime.Collider{ .half_extents = .{ 10.0, 0.25, 10.0 } });

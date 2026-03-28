@@ -135,7 +135,15 @@ pub const Scheduler = struct {
 
     const SystemFn = *const fn (*World) void;
 
+    pub const Phase = enum {
+        pre_update,
+        update,
+        post_update,
+        render,
+    };
+
     pub const SystemGroup = struct {
+        phase: Phase,
         systems: SystemList,
     };
 
@@ -152,11 +160,13 @@ pub const Scheduler = struct {
     pub const System = struct {
         func: SystemFn,
         accesses: AccessList,
+        phase: Phase,
 
-        pub fn init(func: SystemFn, accesses: []ComponentAccess) System {
+        pub fn init(func: SystemFn, accesses: []ComponentAccess, phase: Phase) System {
             return .{
                 .func = func,
                 .accesses = AccessList.fromOwnedSlice(accesses),
+                .phase = phase,
             };
         }
 
@@ -178,6 +188,13 @@ pub const Scheduler = struct {
         scheduler: *Scheduler,
         func: SystemFn,
         accesses: std.ArrayList(ComponentAccess),
+        phase: Phase = .update,
+
+        pub fn inPhase(self: SystemBuilder, phase: Phase) SystemBuilder {
+            var m_self = self;
+            m_self.phase = phase;
+            return m_self;
+        }
 
         pub fn reads(self: SystemBuilder, comptime T: type) SystemBuilder {
             var m_self = self;
@@ -195,6 +212,7 @@ pub const Scheduler = struct {
             self.scheduler.append(.{
                 .func = self.func,
                 .accesses = self.accesses,
+                .phase = self.phase,
             });
         }
     };
@@ -247,15 +265,24 @@ pub const Scheduler = struct {
     }
 
     fn buildGroups(self: *Scheduler) void {
-        self.groups.clearRetainingCapacity();
         for (self.groups.items) |*group| {
             group.systems.deinit(self.allocator);
         }
+        self.groups.clearRetainingCapacity();
+
+        std.mem.sort(System, self.systems.items, {}, struct {
+            fn lessThan(_: void, a: System, b: System) bool {
+                return @intFromEnum(a.phase) < @intFromEnum(b.phase);
+            }
+        }.lessThan);
+
         for (self.systems.items) |sys| {
             var placed = false;
 
             // try to fit into an existing group
             for (self.groups.items) |*group| {
+                if (group.phase != sys.phase) continue;
+
                 var can_fit = true;
 
                 for (group.systems.items) |other| {
@@ -275,6 +302,7 @@ pub const Scheduler = struct {
             // otherwise create new group
             if (!placed) {
                 var new_group = SystemGroup{
+                    .phase = sys.phase,
                     .systems = SystemList.empty,
                 };
                 new_group.systems.append(self.allocator, sys) catch unreachable;
@@ -307,6 +335,7 @@ pub const Scheduler = struct {
             .scheduler = self,
             .func = func,
             .accesses = .empty,
+            .phase = .update,
         };
     }
     fn visit(
