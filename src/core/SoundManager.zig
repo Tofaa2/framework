@@ -1,14 +1,18 @@
+/// Manages audio playback and resource caching using miniaudio.
+/// Handles sound pooling, instance management, and global audio state.
 const std = @import("std");
 const c = @import("thirdparty").miniaudio;
 const SoundManager = @This();
 const Sound = @import("../assets/Sound.zig");
 const MAX_INSTANCES = 8;
 
+/// Internal structure representing a single active or inactive sound instance.
 const SoundInstance = struct {
     sound: c.ma_sound,
     active: bool,
 };
 
+/// A pool of sound instances for a specific audio asset.
 const SoundPool = struct {
     // Decoded audio data shared across all instances
     buffer: c.ma_audio_buffer,
@@ -54,9 +58,13 @@ const SoundPool = struct {
     }
 };
 
+/// Allocator for internal cache and structures.
 allocator: std.mem.Allocator,
+/// The underlying miniaudio engine.
 engine: c.ma_engine,
+/// Whether the audio engine has been successfully initialized.
 engine_ready: bool,
+/// Cache mapping file paths to their respective SoundPools.
 cache: std.StringHashMap(SoundPool),
 
 pub fn init(allocator: std.mem.Allocator) !*SoundManager {

@@ -1,11 +1,16 @@
+/// Represents a textured image asset for use in rendering.
+/// Wraps a bgfx texture handle and maintains image dimensions.
 const bgfx = @import("bgfx").bgfx;
 const c = @import("../utils/stb_image.zig").c;
 const Color = @import("../components/Color.zig");
 const std = @import("std");
 
 const Image = @This();
+/// The underlying bgfx texture handle.
 handle: bgfx.TextureHandle,
+/// The width of the image in pixels.
 width: u32,
+/// The height of the image in pixels.
 height: u32,
 
 pub fn deinit(self: *const Image) void {

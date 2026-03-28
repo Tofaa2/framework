@@ -1,19 +1,26 @@
+/// Defines a flexible event system for decoupled communication between components.
+/// Provides a generic event manager that can handle any tagged union of events.
 const std = @import("std");
 const root = @import("../root.zig");
 
+/// Tagged union representing all possible application-level events and their payloads.
 pub const Event = union(enum) {
+    /// Dispatched when the window dimensions change.
     window_resize: struct {
         old_width: u32,
         new_width: u32,
         old_height: u32,
         new_height: u32,
     },
+    /// Dispatched when a new entity is created.
     entity_create: struct {
         entity: root.Entity,
     },
+    /// Dispatched when an entity is destroyed.
     entity_destroy: struct {
         entity: root.Entity,
     },
+    /// Dispatched every frame update.
     update,
 };
 

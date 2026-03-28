@@ -1,11 +1,11 @@
-/// Axis-aligned bounding box (AABB) collider for 2D and 3D physics.
-/// The AABB world position = entity Transform.center + offset.
+/// Represents an axis-aligned bounding box (AABB) collider for physics detection.
+/// The AABB world position is calculated as the entity's Transform center plus an offset.
 pub const Collider = @This();
 
-/// Half-extents in world units: (half-width X, half-height Y, half-depth Z).
-/// For 2D physics set Z to 0 or a large value to ignore depth.
+/// Half-extents in world units (half-width X, half-height Y, half-depth Z).
+/// For 2D physics set Z to 0.
 half_extents: [3]f32,
-/// Local offset from the entity's Transform.center.
+/// Local offset relative to the entity's Transform center.
 offset: [3]f32 = .{ 0.0, 0.0, 0.0 },
 /// If true, collision is detected but not physically resolved.
 is_trigger: bool = false,

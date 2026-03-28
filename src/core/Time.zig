@@ -1,12 +1,21 @@
+/// Manages application time, delta timing, and FPS calculation.
+/// Provides mechanisms for framerate limiting and performance measurement.
 const Self = @This();
 const std = @import("std");
 
+/// The starting time in nanoseconds.
 start: i128 = 0,
+/// The time elapsed since the previous frame in seconds.
 delta: f64 = 0,
+/// The optional maximum target frames per second.
 fps_limit: ?u32 = null,
+/// The high-resolution timer for FPS limiting.
 timer: std.time.Timer,
+/// The high-resolution timer for delta time measurement.
 frame_timer: std.time.Timer,
+/// The FPS counter that tracks average performance.
 fps: FpsCounter = .{},
+/// The total number of frames rendered since application start.
 current_frame: u512 = 0,
 
 pub const FpsCounter = struct {

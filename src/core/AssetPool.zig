@@ -1,10 +1,12 @@
+/// Manages loading, caching, and reference counting of game assets.
+/// Provides specialized loaders for common asset types like images, fonts, and meshes.
 const std = @import("std");
 const AssetPool = @This();
 const typeId = @import("../utils/type_id.zig").typeIdInt;
 const root = @import("../root.zig");
 const VertexLayout = @import("bgfx").bgfx.VertexLayout;
 
-/// A handle to an asset loaded by the AssetPool.
+/// A type-safe handle to an asset loaded by the AssetPool.
 pub fn Handle(comptime T: type) type {
     _ = T;
     return struct {
@@ -16,9 +18,9 @@ pub fn Handle(comptime T: type) type {
     };
 }
 
-/// The allocator used to allocate memory for assets loaded by the AssetPool.
+/// The allocator used for internal asset storage and loading.
 allocator: std.mem.Allocator,
-/// The stores of assets loaded by the AssetPool, keyed by their type ID.
+/// Map of type IDs to their respective AssetStores.
 stores: std.AutoHashMap(usize, AssetStore),
 
 /// UTILITY FUNCTION:

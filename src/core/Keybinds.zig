@@ -1,33 +1,38 @@
+/// Manages high-level keyboard input mapping and callbacks.
+/// Provides a way to bind specific keys and modifiers to application-level actions.
 const std = @import("std");
 const KeyBinds = @This();
 const App = @import("App.zig");
 const Window = @import("Window.zig");
 
-/// Callback for a keybind, called with the App instance when the key is triggered.
+/// Callback function type for key events.
+/// Takes a pointer to the App instance.
 pub const Callback = *const fn (*App) void;
 
-/// Modifiers for a keybind, specifying which modifier keys must be pressed.
+/// Specifies required keyboard modifiers for a binding.
 pub const Modifiers = struct {
     ctrl: bool = false,
     shift: bool = false,
     alt: bool = false,
 };
 
-/// A keybind, specifying a key and optional modifiers, along with callbacks for press, release, and held events.
+/// Defines a specific key binding with associated callbacks for different event states.
 pub const KeyBind = struct {
-    /// The key pressed
+    /// The primary key for the binding.
     key: Window.Key,
-    /// Modifiers required for the keybind to be triggered
+    /// Modifier keys that must also be held.
     modifiers: Modifiers = .{},
-    /// Callback called when the key is pressed
+    /// Triggered exactly once when the key state changes to pressed.
     on_press: ?Callback = null,
-    /// Callback called when the key is released
+    /// Triggered exactly once when the key state changes to released.
     on_release: ?Callback = null,
-    /// Callback called while the key is held down
+    /// Triggered every frame while the key is held down.
     on_held: ?Callback = null,
 };
 
+/// List of all registered keybindings.
 binds: std.ArrayList(KeyBind),
+/// Allocator for the binding list.
 allocator: std.mem.Allocator,
 
 /// Initializes a new empty KeyBinds instance.

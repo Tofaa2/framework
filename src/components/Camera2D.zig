@@ -1,9 +1,14 @@
+/// Defines a component for a 2D camera in a world space.
+/// Provides view matrix calculation for orthographic rendering.
 const math = @import("../renderer/math.zig");
 const zm = math;
 const Camera2D = @This();
 
+/// The X-coordinate of the camera's position in the world.
 x: f32 = 0,
+/// The Y-coordinate of the camera's position in the world.
 y: f32 = 0,
+/// The zoom level of the camera. 1.0 is default.
 zoom: f32 = 1.0,
 
 pub fn getViewMatrix(self: Camera2D) zm.Mat {

@@ -1,23 +1,32 @@
-// TODO: Rework to support json based loading.
-
+/// Defines how a surface should be rendered, combining a shader program with specific uniform values.
+/// Manages shader parameters like colors, floats, and textures.
 const std = @import("std");
 const bgfx = @import("bgfx").bgfx;
 const ShaderProgram = @import("../renderer/ShaderProgram.zig");
 const Image = @import("../assets/Image.zig");
 const Material = @This();
 
+/// Represents different types of values that can be passed to shader uniforms.
 pub const UniformValue = union(enum) {
+    /// A 4-component floating point vector.
     vec4: [4]f32,
+    /// A single floating point value.
     float: f32,
+    /// A pointer to an Image asset for use as a sampler.
     texture: *const Image,
+    /// An array of up to four 4-component vectors.
     vec4_array: struct {
         data: [4][4]f32, // max 4 elements
         count: u32,
     },
 };
+/// The shader program used by this material.
 program: ShaderProgram,
+/// Map of uniform names to their current values.
 uniforms: std.StringHashMap(UniformValue),
+/// Map of uniform names to their low-level bgfx handles.
 uniform_handles: std.StringHashMap(bgfx.UniformHandle),
+/// Allocator used for internal hash maps.
 allocator: std.mem.Allocator,
 
 pub fn init(allocator: std.mem.Allocator, program: ShaderProgram) Material {

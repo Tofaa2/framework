@@ -1,13 +1,23 @@
+/// Manages the entity component system (ECS) and system scheduling.
+/// Acts as the primary container for game entities, components, and their processing logic.
 const std = @import("std");
 const ecs = @import("ecs");
 const World = @This();
+
+/// Entity handle type.
 pub const Entity = ecs.Entity;
+/// Delegate type for component lifecycle signals.
 pub const SignalFunc = ecs.Delegate(.{ *ecs.Registry, Entity });
 
+/// The underlying ECS registry.
 registry: ecs.Registry,
+/// Allocator used for internal ECS storage and scheduler.
 allocator: std.mem.Allocator,
+/// Manages the order and execution of systems.
 scheduler: *Scheduler,
+/// Map of prefab identifiers to their definitions.
 prefabs: std.StringHashMap(Prefab),
+/// User-defined context pointer.
 ctx: ?*anyopaque = null,
 
 pub fn init(allocator: std.mem.Allocator) *World {

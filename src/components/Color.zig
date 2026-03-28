@@ -1,10 +1,17 @@
+/// Represents an RGBA8 color component.
+/// Provides helper constants and conversions for different color formats.
 const Color = @This();
 
+/// Red component (0-255).
 r: u8,
+/// Green component (0-255).
 g: u8,
+/// Blue component (0-255).
 b: u8,
+/// Alpha component (0-255).
 a: u8,
 
+/// Color constants for standard colors.
 pub const white = Color{ .r = 255, .g = 255, .b = 255, .a = 255 };
 pub const black = Color{ .r = 0, .g = 0, .b = 0, .a = 255 };
 pub const red = Color{ .r = 255, .g = 0, .b = 0, .a = 255 };

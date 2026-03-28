@@ -10,97 +10,97 @@
 /// Variables inside this struct are owned by the app and should NEVER be mutated directly, only accessed, Except for App#running.
 pub const App = @import("core/App.zig");
 
-/// TODO:
+/// Manages window creation, event processing, and input state.
 pub const Window = @import("core/Window.zig");
 
-/// TODO:
+/// Manages loading, caching, and reference counting of game assets.
 pub const AssetPool = @import("core/AssetPool.zig");
 
-/// TODO:
+/// Manages singleton resources and global game states.
 pub const ResourcePool = @import("core/ResourcePool.zig");
 
-/// TODO:
+/// Manages application time, delta timing, and FPS calculation.
 pub const Time = @import("core/Time.zig");
 
-/// TODO:
+/// Manages high-level keyboard input mapping and callbacks.
 pub const Keybinds = @import("core/Keybinds.zig");
 
-/// TODO:
+/// Type-safe handle to an asset managed by the AssetPool.
 pub const Handle = AssetPool.Handle;
 
-/// TODO:
+/// Manages audio playback and resource caching using miniaudio.
 pub const SoundManager = @import("core/SoundManager.zig");
 
-/// TODO:
+/// Manages the entity component system (ECS) and system scheduling.
 pub const World = @import("core/World.zig");
 
-/// TODO:
+/// Tagged union representing all possible application-level events.
 pub const Event = @import("core/event.zig").Event;
 
 /// TODO:
 pub const GenericEventManager = @import("core/event.zig").GenericEventManager;
 
-/// TODO:
+/// Default event manager instance.
 pub const EventManager = @import("core/event.zig").EventManager;
 
-/// TODO:
+/// Interface for extending the application with custom systems.
 pub const Plugin = @import("core/Plugin.zig").Plugin;
 
 // ----- ASSETS -----
 
-/// TODO:
+/// Defines global ambient lighting properties for the scene.
 pub const AmbientLight = @import("assets/AmbientLight.zig");
 
-/// TODO:
+/// Represents a font asset ready for rendering.
 pub const Font = @import("assets/Font.zig");
 
-/// TODO:
+/// Represents a textured image asset for use in rendering.
 pub const Image = @import("assets/Image.zig");
 
-/// TODO:
+/// Represents a sound asset used for audio playback.
 pub const Sound = @import("assets/Sound.zig");
 
-/// TODO:
+/// Defines how a surface should be rendered.
 pub const Material = @import("assets/Material.zig");
 
 /// TODO:
 
 // ----- COMPONENTS -----
 
-/// TODO:
+/// Defines a reference point for positioning UI elements.
 pub const Anchor = @import("components/Anchor.zig");
 
-/// TODO:
+/// Component for a 2D camera in world space.
 pub const Camera2D = @import("components/Camera2D.zig");
 
-/// TODO:
+/// Component for a 3D camera in world space.
 pub const Camera3D = @import("components/Camera3D.zig");
 
-/// TODO:
+/// Represents an RGBA8 color component.
 pub const Color = @import("components/Color.zig");
 
-/// TODO:
+/// Defines a light source component for 3D scenes.
 pub const Light = @import("components/Light.zig");
 
-/// TODO:
+/// Union representing different types of primitives that can be rendered.
 pub const Renderable = @import("components/renderable.zig").Renderable;
 
-/// TODO:
+/// Defines spatial transformation for entities.
 pub const Transform = @import("components/Transform.zig");
 
-/// TODO:
+/// sound source component for audio playback from an entity.
 pub const SoundSource = @import("components/SoundSource.zig");
 
-/// TODO:
+/// Defines per-entity gravity acceleration.
 pub const Gravity = @import("components/Gravity.zig");
 
-/// TODO:
+/// Defines a dynamic physics body component.
 pub const RigidBody = @import("components/RigidBody.zig");
 
-/// TODO:
+/// Axis-aligned bounding box collider for physics detection.
 pub const Collider = @import("components/Collider.zig");
 
-/// TODO:
+/// Defines linear velocity in world space.
 pub const Velocity = @import("components/Velocity.zig");
 
 // ----- RENDERER -----

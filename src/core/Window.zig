@@ -1,12 +1,19 @@
+/// Manages window creation, event processing, and input state using RGFW.
+/// Provides a platform-agnostic interface for windowing and input.
 const std = @import("std");
 const builtin = @import("builtin");
 const Window = @This();
 pub const c = @import("thirdparty").rgfw;
 
+/// Low-level RGFW window handle.
 handle: ?*c.RGFW_window,
+/// Current window width in pixels.
 width: u32,
+/// Current window height in pixels.
 height: u32,
+/// Accumulator for mouse movement since the last frame.
 mouse_delta: [2]f32 = .{ 0.0, 0.0 },
+/// Whether the window was resized during the previous frame.
 resized_last_frame: bool = false,
 
 pub fn getFrameBufferSize(self: *Window) [2]i32 {

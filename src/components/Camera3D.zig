@@ -1,16 +1,27 @@
+/// Defines a component for a 3D camera in world space.
+/// Manages position, orientation (yaw/pitch), and provides matrices for 3D rendering.
 const math = @import("../renderer/math.zig");
 const zm = math;
 const Camera3D = @This();
 const std = @import("std");
 
+/// The world-space position of the camera.
 position: zm.Vec = zm.f32x4(0.0, 0.0, -10.0, 1.0),
+/// The world-space target point the camera is looking at.
 target: zm.Vec = zm.f32x4(0.0, 0.0, 0.0, 1.0),
+/// The upward direction vector for the camera.
 up: zm.Vec = zm.f32x4(0.0, 1.0, 0.0, 0.0),
+/// The movement speed of the camera.
 speed: f32 = 5.0,
+/// The horizontal rotation of the camera in radians.
 yaw: f32 = -std.math.pi / 2.0, // facing -Z by default
+/// The vertical rotation of the camera in radians.
 pitch: f32 = 0.0,
+/// The sensitivity for mouse rotation input.
 sensitivity: f32 = 0.002,
+/// The maximum pitch limit to prevent gimbal lock.
 pitch_clamp: f32 = std.math.pi / 2.0 - 0.01, // prevent gimbal lock
+/// The vertical field of view in radians.
 fov: f32 = std.math.pi / 2.0, // 90 degrees
 
 pub fn init() Camera3D {

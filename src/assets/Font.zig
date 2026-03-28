@@ -1,31 +1,48 @@
+/// Represents a font asset ready for rendering.
+/// Internally uses a texture atlas created from TTF data using stb_truetype.
 const std = @import("std");
 const c = @import("../utils/stb_image.zig").c;
 const Image = @import("Image.zig");
 
 const Font = @This();
 
+/// Individual character metrics and UV coordinates within the atlas.
 pub const Glyph = struct {
-    // UV coordinates in the atlas texture
+    /// Starting U coordinate in the atlas (0.0 to 1.0).
     u0: f32,
+    /// Starting V coordinate in the atlas (0.0 to 1.0).
     v0: f32,
+    /// Ending U coordinate in the atlas (0.0 to 1.0).
     u1: f32,
+    /// Ending V coordinate in the atlas (0.0 to 1.0).
     v1: f32,
-    // glyph metrics
+    /// Width of the glyph in pixels.
     width: f32,
+    /// Height of the glyph in pixels.
     height: f32,
+    /// Horizontal offset from cursor to start of glyph.
     x_offset: f32,
+    /// Vertical offset from cursor to start of glyph.
     y_offset: f32,
+    /// Distance to advance the cursor after drawing this glyph.
     x_advance: f32,
 };
 
+/// The texture containing all rendered glyphs.
 atlas: Image,
+/// Array of glyph metrics for printable ASCII characters (32..127).
 glyphs: [96]Glyph,
+/// The font size used when baking the atlas.
 font_size: f32,
+/// The dimension (width and height) of the square atlas texture.
 atlas_size: u32,
+/// The offset from the baseline for standard characters.
 baseline_offset: f32,
 
+/// The maximum height above the baseline.
 ascent: f32,
 
+/// Loads a TTF font from a file path and bakes it into an atlas.
 pub fn initFile(path: []const u8, font_size: f32, atlas_size: u32) Font {
     const file = std.fs.cwd().openFile(path, .{}) catch |err| {
         std.debug.panic("Failed to open font file: {s} — {}\n", .{ path, err });

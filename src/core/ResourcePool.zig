@@ -1,8 +1,12 @@
+/// Manages singleton resources or game states accessible throughout the application.
+/// Resources are keyed by their type and automatically destroyed when the pool is deinitialized.
 const std = @import("std");
 const ResourcePool = @This();
 const typeId = @import("../utils/type_id.zig").typeIdInt;
 
+/// The allocator used for internal resource storage.
 allocator: std.mem.Allocator,
+/// Map of type IDs to their respective resource entries.
 map: std.AutoHashMap(usize, ResourceEntry),
 
 pub fn init(allocator: std.mem.Allocator) !*ResourcePool {
