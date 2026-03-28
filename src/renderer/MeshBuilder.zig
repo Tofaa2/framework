@@ -272,11 +272,39 @@ pub fn buildMesh(self: *MeshBuilder, layout: *const bgfx.VertexLayout) Mesh {
         bgfx.copy(self.indices.items.ptr, @intCast(@sizeOf(u16) * self.indices.items.len)),
         bgfx.BufferFlags_None,
     );
+
+    // compute bounding sphere
+    var cx: f32 = 0;
+    var cy: f32 = 0;
+    var cz: f32 = 0;
+    const count: f32 = @floatFromInt(self.vertices.items.len);
+
+    // find centroid
+    for (self.vertices.items) |v| {
+        cx += v.position[0];
+        cy += v.position[1];
+        cz += v.position[2];
+    }
+    cx /= count;
+    cy /= count;
+    cz /= count;
+
+    // find max distance from centroid
+    var max_r: f32 = 0;
+    for (self.vertices.items) |v| {
+        const dx = v.position[0] - cx;
+        const dy = v.position[1] - cy;
+        const dz = v.position[2] - cz;
+        max_r = @max(max_r, @sqrt(dx * dx + dy * dy + dz * dz));
+    }
+
     return .{
         .vbh = vbh,
         .ibh = ibh,
         .num_vertices = @intCast(self.vertices.items.len),
         .num_indices = @intCast(self.indices.items.len),
+        .bounding_center = .{ cx, cy, cz },
+        .bounding_radius = max_r,
     };
 }
 
@@ -294,11 +322,39 @@ pub fn buildFromSlices(
         bgfx.copy(indices.ptr, @intCast(@sizeOf(u16) * indices.len)),
         bgfx.BufferFlags_None,
     );
+
+    // compute bounding sphere
+    var cx: f32 = 0;
+    var cy: f32 = 0;
+    var cz: f32 = 0;
+    const count: f32 = @floatFromInt(vertices.len);
+
+    // find centroid
+    for (vertices) |v| {
+        cx += v.position[0];
+        cy += v.position[1];
+        cz += v.position[2];
+    }
+    cx /= count;
+    cy /= count;
+    cz /= count;
+
+    // find max distance from centroid
+    var max_r: f32 = 0;
+    for (vertices) |v| {
+        const dx = v.position[0] - cx;
+        const dy = v.position[1] - cy;
+        const dz = v.position[2] - cz;
+        max_r = @max(max_r, @sqrt(dx * dx + dy * dy + dz * dz));
+    }
+
     return Mesh{
         .vbh = vbh,
         .ibh = ibh,
         .num_vertices = @intCast(vertices.len),
         .num_indices = @intCast(indices.len),
+        .bounding_center = [3]f32{ cx, cy, cz },
+        .bounding_radius = max_r,
     };
 }
 

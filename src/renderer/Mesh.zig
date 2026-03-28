@@ -21,6 +21,9 @@ material: ?*Material = null,
 texture: Handle(Image) = .invalid,
 transform: ?math.Mat = null,
 
+bounding_radius: f32 = 1.0,
+bounding_center: [3]f32 = .{ 0.0, 0.0, 0.0 },
+
 pub fn deinit(self: *Mesh) void {
     bgfx.destroyVertexBuffer(self.vbh);
     bgfx.destroyIndexBuffer(self.ibh);

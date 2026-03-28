@@ -22,6 +22,7 @@ pub const Mesh = @import("Mesh.zig");
 pub const DynamicMesh = @import("DynamicMesh.zig");
 pub const ObjLoader = @import("ObjLoader.zig");
 pub const Material = @import("../assets/Material.zig");
+pub const Frustum = @import("Frustum.zig");
 
 pub const BuiltinMaterial = enum {
     unlit,
@@ -67,6 +68,8 @@ pub const Renderer = struct {
         if (!bgfx.init(&bgfx_init)) {
             return error.InitFailed;
         }
+
+        bgfx.setDebug(bgfx.DebugFlags_Stats);
 
         const tex_uniform = bgfx.createUniform("s_texColor", .Sampler, 1);
         const backend = bgfx.getRendererType();
@@ -202,11 +205,30 @@ pub const Renderer = struct {
 
     fn drawView(self: *Renderer, view: *View, assets: *@import("../core/AssetPool.zig")) void {
         const view_id: u8 = @intFromEnum(view.id);
-
-        // dynamic meshes via render commands (ECS rendering)
+        const vp = zm.mul(view.view_mtx, view.proj_mtx);
+        const frustum = Frustum.fromViewProj(vp);
         for (view.render_commands.items) |cmd| {
             const mesh = cmd.mesh;
-            const arr = math.matToArr(cmd.transform); // no transpose needed, row-major math
+
+            const world_center = if (mesh.transform) |t| blk: {
+                const c = mesh.bounding_center;
+                const wc = zm.mul(zm.f32x4(c[0], c[1], c[2], 1.0), t);
+                break :blk [3]f32{ wc[0], wc[1], wc[2] };
+            } else mesh.bounding_center;
+            const radius = mesh.bounding_radius;
+            const cam_pos = view.cam_pos;
+            if (view.max_draw_distance) |max_dist| {
+                if (view.cam_pos == null) continue;
+                const dx = world_center[0] - cam_pos.?[0];
+                const dy = world_center[1] - cam_pos.?[1];
+                const dz = world_center[2] - cam_pos.?[2];
+                if (dx * dx + dy * dy + dz * dz > max_dist * max_dist) continue;
+            }
+            if (!frustum.containsSphere(world_center[0], world_center[1], world_center[2], radius)) {
+                continue; // cull
+            }
+
+            const arr = math.matToArr(cmd.transform);
             _ = bgfx.setTransform(&arr, 1);
 
             const mat = if (mesh.material) |m| m else self.materials.getPtr(.unlit).?;

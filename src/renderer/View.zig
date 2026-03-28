@@ -28,14 +28,14 @@ view_mtx: math.Mat = math.identity(),
 model_mtx: math.Mat = math.identity(),
 clear_color: Color = .black,
 clear_flags: u16 = bgfx.ClearFlags_Color | bgfx.ClearFlags_Depth,
-
+max_draw_distance: ?f32 = null, // null = unlimited
 transient_submissions: std.ArrayList(TransientSubmission) = .empty,
 render_commands: std.ArrayList(RenderCommand) = .empty,
 dynamic_meshes: std.ArrayList(*DynamicMesh) = .empty,
-
+cam_pos: ?[3]f32 = null, // Similar behaviour to max_draw_distance being null
 allocator: std.mem.Allocator,
 
-    // Replaced meshes with per-frame render_commands
+// Replaced meshes with per-frame render_commands
 
 pub fn addDynamicMesh(self: *Self, mesh: *DynamicMesh) void {
     self.dynamic_meshes.append(self.allocator, mesh) catch unreachable;
