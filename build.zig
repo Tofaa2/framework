@@ -23,6 +23,7 @@ pub fn build(b: *Build) !void {
     runtime.linkLibrary(thirdparty);
     linkSimpleModDep(b, runtime, "entt", "ecs", "zig-ecs");
     linkSimpleModDep(b, runtime, "zaudio", "zaudio", "root");
+    linkSimpleModDep(b, runtime, "slime", "slime", "slime");
     try linkBgfx(b, target, optimize, runtime);
     const sandbox = buildSandbox(b, target, optimize, &.{.{ .name = "runtime", .module = runtime }});
 
@@ -166,6 +167,16 @@ fn linkBgfx(b: *std.Build, target: std.Build.ResolvedTarget, optimize: std.built
                 .name = "fs_diffuse",
                 .shaderType = .fragment,
                 .path = b.path("src/renderer/shaders/fs_diffuse.sc"),
+            },
+            .{
+                .name = "vs_skybox",
+                .shaderType = .vertex,
+                .path = b.path("src/renderer/shaders/skybox/vs_skybox.sc"),
+            },
+            .{
+                .name = "fs_skybox",
+                .shaderType = .fragment,
+                .path = b.path("src/renderer/shaders/skybox/fs_skybox.sc"),
             },
             .{
                 .name = "vs_diffuse",

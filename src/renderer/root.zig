@@ -27,6 +27,7 @@ pub const Frustum = @import("Frustum.zig");
 pub const BuiltinMaterial = enum {
     unlit,
     diffuse,
+    skybox,
 };
 
 pub const Renderer = struct {
@@ -82,12 +83,19 @@ pub const Renderer = struct {
             shaders.vs_diffuse.getShaderForRenderer(backend),
             shaders.fs_diffuse.getShaderForRenderer(backend),
         );
+
+        const skybox_program = try ShaderProgram.initFromMem(
+            shaders.vs_skybox.getShaderForRenderer(backend),
+            shaders.fs_skybox.getShaderForRenderer(backend),
+        );
+
         var materials = std.EnumMap(BuiltinMaterial, Material){};
         const unlit = Material.init(allocator, unlit_program);
         const diffuse = Material.init(allocator, diffuse_program);
-
+        const skybox_mat = Material.init(allocator, skybox_program);
         materials.put(.unlit, unlit);
         materials.put(.diffuse, diffuse);
+        materials.put(.skybox, skybox_mat);
 
         var layout = std.mem.zeroes(bgfx.VertexLayout);
         _ = layout.begin(backend);
@@ -107,6 +115,7 @@ pub const Renderer = struct {
                 -1.0,
                 1.0,
             ),
+            .clear_flags = bgfx.ClearFlags_Depth,
             .id = .@"2d",
             .allocator = allocator,
         }) catch unreachable;
@@ -139,6 +148,15 @@ pub const Renderer = struct {
             .id = .ui,
             .allocator = allocator,
         }) catch unreachable;
+
+        views.put(.skybox, .{
+            .proj_mtx = math.orthographicOffCenterRhGl(-1.0, 1.0, -1.0, 1.0, -1.0, 1.0),
+            .clear_flags = bgfx.ClearFlags_Color | bgfx.ClearFlags_Depth,
+            .clear_color = .{ .r = 255, .g = 0, .b = 0, .a = 255 },
+            .id = .skybox,
+            .allocator = allocator,
+        }) catch unreachable;
+
         self.allocator = allocator;
         self.viewport = viewport;
         self.unlit_program = unlit_program;
@@ -184,24 +202,46 @@ pub const Renderer = struct {
             );
         }
     }
-
     pub fn draw(self: *Renderer, assets: *@import("../core/AssetPool.zig")) void {
-        var iter = self.views.iterator();
-        while (iter.next()) |entry| {
-            const view = entry.value_ptr;
-            const view_id: u8 = @intFromEnum(view.id);
-            bgfx.setViewClear(view_id, view.clear_flags, view.clear_color.toRGBA(), 1.0, 0.0);
-            bgfx.setViewRect(view_id, 0, 0, @intCast(self.viewport.width), @intCast(self.viewport.height));
-            bgfx.setViewTransform(view_id, &math.matToArr(view.view_mtx), &math.matToArr(view.proj_mtx));
-            bgfx.touch(view_id);
+        // setup pass - in ID order
+        inline for (std.meta.fields(View.Id)) |field| {
+            const id: View.Id = @enumFromInt(field.value);
+            if (self.views.getPtr(id)) |view| {
+                const view_id: u8 = @intFromEnum(view.id);
+                bgfx.setViewClear(view_id, view.clear_flags, view.clear_color.toRGBA(), 1.0, 0.0);
+                bgfx.setViewRect(view_id, 0, 0, @intCast(self.viewport.width), @intCast(self.viewport.height));
+                bgfx.setViewTransform(view_id, &math.matToArr(view.view_mtx), &math.matToArr(view.proj_mtx));
+                bgfx.touch(view_id);
+            }
         }
-        iter = self.views.iterator();
-        while (iter.next()) |entry| {
-            const view = entry.value_ptr;
-            self.drawView(view, assets);
+        // draw pass - in ID order
+        inline for (std.meta.fields(View.Id)) |field| {
+            const id: View.Id = @enumFromInt(field.value);
+            if (self.views.getPtr(id)) |view| {
+                self.drawView(view, assets);
+            }
         }
         _ = bgfx.frame(bgfx.FrameFlags_None);
     }
+
+    //
+    // pub fn draw(self: *Renderer, assets: *@import("../core/AssetPool.zig")) void {
+    //     var iter = self.views.iterator();
+    //     while (iter.next()) |entry| {
+    //         const view = entry.value_ptr;
+    //         const view_id: u8 = @intFromEnum(view.id);
+    //         bgfx.setViewClear(view_id, view.clear_flags, view.clear_color.toRGBA(), 1.0, 0.0);
+    //         bgfx.setViewRect(view_id, 0, 0, @intCast(self.viewport.width), @intCast(self.viewport.height));
+    //         bgfx.setViewTransform(view_id, &math.matToArr(view.view_mtx), &math.matToArr(view.proj_mtx));
+    //         bgfx.touch(view_id);
+    //     }
+    //     iter = self.views.iterator();
+    //     while (iter.next()) |entry| {
+    //         const view = entry.value_ptr;
+    //         self.drawView(view, assets);
+    //     }
+    //     _ = bgfx.frame(bgfx.FrameFlags_None);
+    // }
 
     fn drawView(self: *Renderer, view: *View, assets: *@import("../core/AssetPool.zig")) void {
         const view_id: u8 = @intFromEnum(view.id);
@@ -209,7 +249,6 @@ pub const Renderer = struct {
         const frustum = Frustum.fromViewProj(vp);
         for (view.render_commands.items) |cmd| {
             const mesh = cmd.mesh;
-
             const world_center = if (mesh.transform) |t| blk: {
                 const c = mesh.bounding_center;
                 const wc = zm.mul(zm.f32x4(c[0], c[1], c[2], 1.0), t);
@@ -224,7 +263,9 @@ pub const Renderer = struct {
                 const dz = world_center[2] - cam_pos.?[2];
                 if (dx * dx + dy * dy + dz * dz > max_dist * max_dist) continue;
             }
-            if (!frustum.containsSphere(world_center[0], world_center[1], world_center[2], radius)) {
+            const skip_culling = view.id == .skybox or view.id == .@"2d" or view.id == .ui;
+
+            if (!skip_culling and !frustum.containsSphere(world_center[0], world_center[1], world_center[2], radius)) {
                 continue; // cull
             }
 

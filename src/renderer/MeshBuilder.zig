@@ -32,6 +32,20 @@ pub fn deinit(self: *MeshBuilder) void {
     self.indices.deinit(self.allocator);
 }
 
+pub fn pushGradientRect(
+    self: *MeshBuilder,
+    x: f32, y: f32, w: f32, h: f32,
+    top_left: Color, top_right: Color,
+    bottom_left: Color, bottom_right: Color,
+) void {
+    self.pushQuad(
+        .init(.{ x,     y,     0 }, top_left,     .{ 0, 0 }),
+        .init(.{ x + w, y,     0 }, top_right,    .{ 1, 0 }),
+        .init(.{ x + w, y + h, 0 }, bottom_right, .{ 1, 1 }),
+        .init(.{ x,     y + h, 0 }, bottom_left,  .{ 0, 1 }),
+    );
+}
+
 pub fn reset(self: *MeshBuilder) void {
     self.vertices.clearRetainingCapacity();
     self.indices.clearRetainingCapacity();

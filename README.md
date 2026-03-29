@@ -99,9 +99,10 @@ MIGRATED TO BASKET (https://github.com/Tofaa2/basket)
 - [x] 2D primitives (circle, rect, line, quad, triangle)
 - [x] Anchor system for resolution-independent positioning
 - [x] Separate 2D and 3D views with correct coordinate systems
+- [ ] Cubemaps
 - [ ] Point lights and spot lights
 - [ ] Shadow mapping
-- [ ] Skybox / environment map
+- [x] Skybox / environment map
 - [ ] Render passes and framebuffers
 - [ ] Post-processing effects (bloom, blur, tonemapping)
 - [ ] Sprite sheets and UV sub-regions

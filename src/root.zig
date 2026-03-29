@@ -48,6 +48,9 @@ pub const Plugin = @import("core/Plugin.zig").Plugin;
 
 // ----- ASSETS -----
 
+/// Simple color gradient skybox
+pub const Skybox = @import("assets/Skybox.zig");
+
 /// Defines global ambient lighting properties for the scene.
 pub const AmbientLight = @import("assets/AmbientLight.zig");
 
@@ -62,6 +65,9 @@ pub const Sound = @import("assets/Sound.zig");
 
 /// Defines how a surface should be rendered.
 pub const Material = @import("assets/Material.zig");
+
+/// Defines a cubemap. Which is a texture that is 6 baked textures.
+pub const Cubemap = @import("assets/Cubemap.zig");
 
 /// TODO:
 
@@ -139,6 +145,7 @@ pub const rmath = @import("renderer/math.zig");
 
 /// TODO:
 pub const ecs = @import("ecs");
+pub const ecs2 = @import("slime");
 
 /// TODO:
 pub const Entity = ecs.Entity;

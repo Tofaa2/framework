@@ -25,5 +25,9 @@
             .url = "git+https://github.com/zig-gamedev/zaudio/#e5b89fde58be72de359089e9b8f5c4d5126fb159",
             .hash = "zaudio-0.11.0-dev-_M-91uMxQQAWK02Oofoq8EFtqHwcSrJ-ISYEkcPJvViz",
         },
+        .slime = .{
+            .url = "git+https://github.com/Tofaa2/slime#77b2c9ea1687c494a2f7c0d3f3e4fe5498a350c0",
+            .hash = "slime-0.0.0-Ex8DOMCKAQBmNTrrSQM3PxycMGyL93pLZo1aM7nxS1ra",
+        },
     },
 }

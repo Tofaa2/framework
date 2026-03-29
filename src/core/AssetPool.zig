@@ -38,6 +38,13 @@ pub fn loadImage(self: *AssetPool, path: []const u8) !Handle(root.Image) {
 }
 
 /// UTILITY FUNCTION:
+/// Loads a cubemap from a given set of paths.
+pub fn loadCubemap(self: *AssetPool, faces: root.Cubemap.Faces) !Handle(root.Cubemap) {
+    const cubemap = try root.Cubemap.initFromFiles(faces);
+    return self.loadAsset(root.Cubemap, cubemap);
+}
+
+/// UTILITY FUNCTION:
 /// Loads a font asset from the given path.
 pub fn loadFont(self: *AssetPool, path: []const u8, w: f32, size: u32) !Handle(root.Font) {
     return self.loadAsset(root.Font, root.Font.initFile(path, w, size));

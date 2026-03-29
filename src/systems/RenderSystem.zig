@@ -10,7 +10,35 @@ fn resolvePosition(world: *root.World, entity: anytype, transform: root.Transfor
     }
     return .{ transform.center[0], transform.center[1] };
 }
+fn renderSkybox(app: *root.App) void {
+    const skybox = app.resources.get(root.Skybox) orelse return;
+    const view = app.renderer.getView(.skybox).?;
 
+    var builder = root.MeshBuilder.init(app.allocator);
+    defer builder.deinit();
+
+    switch (skybox.mode) {
+        .gradient => |g| {
+            builder.pushGradientRect(
+                -1.0,
+                -1.0,
+                2.0,
+                2.0,
+                g.top_color,
+                g.top_color,
+                g.bottom_color,
+                g.bottom_color,
+            );
+            builder.submitTransient(view, null, null, null, false);
+        },
+        .texture => |t| {
+            const image = app.assets.getAsset(root.Image, t.image) orelse return;
+            // push a white textured rect — texture provides the color
+            builder.pushTexturedRect(-1.0, -1.0, 2.0, 2.0, .white);
+            builder.submitTransient(view, null, image, null, false);
+        },
+    }
+}
 fn updateLights(world: *root.World, renderer: *root.Renderer, app: *root.App) void {
     const ambient = app.resources.get(root.AmbientLight) orelse &root.AmbientLight{};
     const ambient_color: [4]f32 = .{
@@ -150,7 +178,6 @@ fn renderSystem(world: *root.World) void {
     defer builder.deinit();
 
     render2D(world, &builder, app);
+    renderSkybox(app);
     render3D(world, app);
 }
-
-

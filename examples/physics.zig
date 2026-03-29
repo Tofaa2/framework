@@ -1,5 +1,6 @@
 const runtime = @import("runtime");
 const std = @import("std");
+const common = @import("common.zig");
 
 const AppState = struct {
     bunny_mesh: runtime.Handle(runtime.Mesh),
@@ -18,7 +19,7 @@ pub fn main() !void {
         .height = 720,
     });
     defer app.deinit();
-
+    common.createSkybox(app);
     app.time.fps_limit = 165;
     app.window.setMouseCaptured(true);
 

@@ -1,6 +1,15 @@
 const runtime = @import("runtime");
 const std = @import("std");
 
+pub fn createSkybox(app: *runtime.App) void {
+    const skybox = runtime.Skybox{
+        .mode = .{
+            .gradient = .{ .top_color = .cyan, .bottom_color = .white },    
+        },
+    };
+    app.resources.add(skybox) catch unreachable;
+}
+
 pub fn setupBinds(binds: *runtime.Keybinds) void {
     binds.bind(.{ .key = .w, .on_held = struct {
         fn f(app: *runtime.App) void {

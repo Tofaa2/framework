@@ -13,6 +13,14 @@ pub fn main() !void {
     });
     defer app.deinit();
 
+    const skybox_texture = try app.assets.loadImage("assets/skybox.png");
+    const skybox = runtime.Skybox{
+        .mode = .{
+            .texture = .{ .image = skybox_texture },
+        },
+    };
+    try app.resources.add(skybox);
+
     const font = try app.assets.loadAsset(runtime.Font, runtime.Font.initFile("assets/Roboto-Regular.ttf", 32, 512));
 
     app.window.setMouseCaptured(true);

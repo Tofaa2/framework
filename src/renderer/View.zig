@@ -16,10 +16,12 @@ pub const RenderCommand = struct {
 
 pub const Map = std.AutoArrayHashMap(Id, Self);
 
+
 pub const Id = enum(u8) {
-    @"2d" = 0,
+    skybox = 0,
     @"3d" = 1,
-    ui = 2,
+    @"2d" = 2,
+    ui = 3,
 };
 
 id: Id,
