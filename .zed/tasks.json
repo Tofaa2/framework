@@ -1,10 +1,6 @@
 [
   {
     "label": "Run Sandbox",
-    "command": "zig build run",
-  },
-  {
-    "label": "Run Physics",
-    "command": "zig build physics",
+    "command": "zig build sandbox",
   },
 ]

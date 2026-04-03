@@ -17,17 +17,10 @@
             .url = "git+https://github.com/cyberegoorg/zbgfx/#f464e57e0076d005b72a13c0fb84ec379f60b9b7",
             .hash = "zbgfx-0.8.0-Sm4IxLWhugYcCqQ4NdRfeC_HS1ZeekK2eoWFCFOzY94d",
         },
-        .entt = .{
-            .url = "git+https://github.com/prime31/zig-ecs/#dbf3647c2cc4f327fe87067e40f8436c7f87f209",
-            .hash = "entt-1.0.0-qJPtbNLVAgDPXaUbyRSsBTK75Cr1WujUA92kToJugWry",
-        },
+
         .zaudio = .{
             .url = "git+https://github.com/zig-gamedev/zaudio/#e5b89fde58be72de359089e9b8f5c4d5126fb159",
             .hash = "zaudio-0.11.0-dev-_M-91uMxQQAWK02Oofoq8EFtqHwcSrJ-ISYEkcPJvViz",
-        },
-        .slime = .{
-            .url = "git+https://github.com/Tofaa2/slime#77b2c9ea1687c494a2f7c0d3f3e4fe5498a350c0",
-            .hash = "slime-0.0.0-Ex8DOMCKAQBmNTrrSQM3PxycMGyL93pLZo1aM7nxS1ra",
         },
     },
 }

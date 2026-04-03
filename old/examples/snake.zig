@@ -1,0 +1,357 @@
+const runtime = @import("runtime");
+const std = @import("std");
+const common = @import("common.zig");
+
+const GRID_W = 20;
+const GRID_H = 20;
+const CELL_SIZE: f32 = 32.0;
+const GRID_OFFSET_X: f32 = 100.0;
+const GRID_OFFSET_Y: f32 = 100.0;
+
+pub const GridPos = struct {
+    x: i32,
+    y: i32,
+};
+
+pub const SnakeSegment = struct {
+    next: ?runtime.ecs.Entity = null,
+};
+
+pub const SnakeHead = struct {
+    dir_x: i32 = 1,
+    dir_y: i32 = 0,
+    next_dir_x: i32 = 1,
+    next_dir_y: i32 = 0,
+    move_timer: f32 = 0,
+    move_interval: f32 = 0.15,
+};
+
+pub const Food = struct {};
+
+pub const Score = struct {
+    value: u32 = 0,
+};
+
+pub const GameState = enum {
+    playing,
+    game_over,
+};
+
+var score_buf: [32]u8 = undefined;
+var game_over_buf: [64]u8 = undefined;
+var fps_buf: [32]u8 = undefined;
+
+pub fn main() !void {
+    var gpa = std.heap.GeneralPurposeAllocator(.{}){};
+    defer _ = gpa.deinit();
+    const allocator = gpa.allocator(); // std.heap.c_allocator;
+
+    var app = try runtime.App.init(allocator, .{
+        .name = "Hello, World",
+        .width = 800,
+        .height = 600,
+    });
+    defer app.deinit();
+
+    const font = try app.assets.loadFont("assets/Roboto-Regular.ttf", 32, 512);
+
+    common.setFPSMax(app, 60);
+    try app.resources.add(Score{});
+    try app.resources.add(GameState.playing);
+
+    // grid background
+    const grid_bg = app.world.create();
+    app.world.add(grid_bg, runtime.Transform{
+        .center = .{
+            GRID_OFFSET_X + (GRID_W * CELL_SIZE) / 2.0,
+            GRID_OFFSET_Y + (GRID_H * CELL_SIZE) / 2.0,
+            0,
+        },
+    });
+    app.world.add(grid_bg, runtime.Renderable{ .rect = .{
+        .width = GRID_W * CELL_SIZE,
+        .height = GRID_H * CELL_SIZE,
+    } });
+    app.world.add(grid_bg, runtime.Color{ .r = 40, .g = 40, .b = 40, .a = 255 });
+
+    spawnSnake(app);
+    spawnFood(app);
+
+    // fps counter
+    const fps_label = app.world.create();
+    app.world.add(fps_label, runtime.Transform{});
+    app.world.add(fps_label, runtime.Anchor{ .point = .top_right, .offset = .{ -150.0, 10.0 } });
+    app.world.add(fps_label, runtime.Renderable{ .fmt_text = .{
+        .font = font,
+        .buf = &fps_buf,
+        .format_fn = struct {
+            fn f(buf: []u8, a: *runtime.App) []u8 {
+                const fps = a.time.fps.fps;
+                return std.fmt.bufPrint(buf, "FPS: {d:.0}", .{fps}) catch buf[0..0];
+            }
+        }.f,
+    } });
+
+    // score counter
+    const score_label = app.world.create();
+    app.world.add(score_label, runtime.Transform{});
+    app.world.add(score_label, runtime.Anchor{ .point = .top_left, .offset = .{ 10.0, 10.0 } });
+    app.world.add(score_label, runtime.Renderable{ .fmt_text = .{
+        .font = font,
+        .buf = &score_buf,
+        .format_fn = struct {
+            fn f(buf: []u8, a: *runtime.App) []u8 {
+                const score = a.resources.get(Score).?.value;
+                return std.fmt.bufPrint(buf, "Score: {d}", .{score}) catch buf[0..0];
+            }
+        }.f,
+    } });
+
+    // game over label
+    const game_over_label = app.world.create();
+    app.world.add(game_over_label, runtime.Transform{});
+    app.world.add(game_over_label, runtime.Anchor{ .point = .center, .offset = .{ -280.0, -20.0 } });
+    app.world.add(game_over_label, runtime.Renderable{ .fmt_text = .{
+        .font = font,
+        .buf = &game_over_buf,
+        .format_fn = struct {
+            fn f(buf: []u8, a: *runtime.App) []u8 {
+                const state = a.resources.get(GameState).?;
+                if (state.* == .game_over) {
+                    const score = a.resources.get(Score).?.value;
+                    return std.fmt.bufPrint(buf, "Game Over! Score: {d} - Press Enter to restart", .{score}) catch buf[0..0];
+                }
+                return buf[0..0];
+            }
+        }.f,
+    } });
+
+    app.world.scheduler.buildSystem(updateLoop)
+        .reads(SnakeHead)
+        .reads(GridPos)
+        .reads(Food)
+        .append();
+    app.world.scheduler.buildSystem(updateTransforms)
+        .reads(GridPos)
+        .writes(runtime.Transform)
+        .append();
+    app.world.scheduler.buildSystem(updateSnake)
+        .reads(SnakeSegment)
+        .writes(SnakeHead)
+        .writes(GridPos)
+        .reads(Food)
+        .append();
+
+    app.run();
+}
+fn gridToWorld(gx: i32, gy: i32) [2]f32 {
+    return .{
+        GRID_OFFSET_X + @as(f32, @floatFromInt(gx)) * CELL_SIZE + CELL_SIZE / 2.0,
+        GRID_OFFSET_Y + @as(f32, @floatFromInt(gy)) * CELL_SIZE + CELL_SIZE / 2.0,
+    };
+}
+
+fn resetSnake(app: *runtime.App) void {
+    // destroy all snake segments
+    var iter = app.world.view(&.{SnakeSegment}, .{});
+    var to_delete = std.ArrayList(runtime.ecs.Entity).initCapacity(app.allocator, 8) catch unreachable;
+    defer to_delete.deinit(app.allocator);
+    while (iter.next()) |entity| {
+        to_delete.append(app.allocator, entity.entity) catch unreachable;
+    }
+    for (to_delete.items) |entity| {
+        app.world.destroy(entity);
+    }
+
+    // spawn fresh snake
+    spawnSnake(app);
+}
+
+fn updateLoop(world: *runtime.World) void {
+    const app: *runtime.App = @ptrCast(@alignCast(world.ctx.?));
+    var win = app.window;
+    const state = app.resources.getMut(GameState).?;
+    if (state.* == .game_over) {
+        if (win.isKeyPressed(.@"return")) {
+            state.* = .playing;
+            app.resources.getMut(Score).?.value = 0;
+            resetSnake(app);
+            // reset food
+            var fq = app.world.view(&.{ GridPos, Food }, .{});
+            if (fq.next()) |fe| {
+                const fp = app.world.get(GridPos, fe.entity);
+                fp.x = 15;
+                fp.y = 10;
+            }
+        }
+        return;
+    }
+
+    var query = app.world.view(&.{SnakeHead}, .{});
+    const head_entity = query.next() orelse return;
+    const head = app.world.get(SnakeHead, head_entity.entity);
+
+    if (win.isKeyPressed(.up) and head.dir_y == 0) {
+        head.next_dir_x = 0;
+        head.next_dir_y = -1;
+    }
+    if (win.isKeyPressed(.down) and head.dir_y == 0) {
+        head.next_dir_x = 0;
+        head.next_dir_y = 1;
+    }
+    if (win.isKeyPressed(.left) and head.dir_x == 0) {
+        head.next_dir_x = -1;
+        head.next_dir_y = 0;
+    }
+    if (win.isKeyPressed(.right) and head.dir_x == 0) {
+        head.next_dir_x = 1;
+        head.next_dir_y = 0;
+    }
+}
+
+fn spawnSnake(app: *runtime.App) void {
+    const tail = app.world.create();
+    app.world.add(tail, GridPos{ .x = 8, .y = 10 });
+    app.world.add(tail, SnakeSegment{ .next = null });
+    app.world.add(tail, runtime.Transform{});
+    app.world.add(tail, runtime.Renderable{ .rect = .{ .width = CELL_SIZE - 2, .height = CELL_SIZE - 2 } });
+    app.world.add(tail, runtime.Color{ .r = 0, .g = 200, .b = 0, .a = 255 });
+
+    const mid = app.world.create();
+    app.world.add(mid, GridPos{ .x = 9, .y = 10 });
+    app.world.add(mid, SnakeSegment{ .next = tail });
+    app.world.add(mid, runtime.Transform{});
+    app.world.add(mid, runtime.Renderable{ .rect = .{ .width = CELL_SIZE - 2, .height = CELL_SIZE - 2 } });
+    app.world.add(mid, runtime.Color{ .r = 0, .g = 200, .b = 0, .a = 255 });
+
+    const head = app.world.create();
+    app.world.add(head, GridPos{ .x = 10, .y = 10 });
+    app.world.add(head, SnakeSegment{ .next = mid });
+    app.world.add(head, SnakeHead{});
+    app.world.add(head, runtime.Transform{});
+    app.world.add(head, runtime.Renderable{ .rect = .{ .width = CELL_SIZE - 2, .height = CELL_SIZE - 2 } });
+    app.world.add(head, runtime.Color{ .r = 0, .g = 255, .b = 0, .a = 255 });
+}
+
+fn spawnFood(app: *runtime.App) void {
+    const food = app.world.create();
+    app.world.add(food, GridPos{ .x = 15, .y = 10 });
+    app.world.add(food, Food{});
+    app.world.add(food, runtime.Transform{});
+    app.world.add(food, runtime.Renderable{ .rect = .{ .width = CELL_SIZE - 2, .height = CELL_SIZE - 2 } });
+    app.world.add(food, runtime.Color{ .r = 255, .g = 0, .b = 0, .a = 255 });
+}
+
+fn updateTransforms(world: *runtime.World) void {
+    const app: *runtime.App = @ptrCast(@alignCast(world.ctx.?));
+    var iter = app.world.view(&.{ GridPos, runtime.Transform }, .{});
+    while (iter.next()) |entity| {
+        const pos = app.world.getConst(GridPos, entity.entity);
+        const transform = app.world.get(runtime.Transform, entity.entity);
+        const world_pos = gridToWorld(pos.x, pos.y);
+        transform.center[0] = world_pos[0];
+        transform.center[1] = world_pos[1];
+    }
+}
+
+fn isOccupiedBySnake(app: *runtime.App, x: i32, y: i32) bool {
+    var iter = app.world.view(&.{ GridPos, SnakeSegment }, .{});
+    while (iter.next()) |entity| {
+        const pos = app.world.getConst(GridPos, entity.entity);
+        if (pos.x == x and pos.y == y) return true;
+    }
+    return false;
+}
+
+fn updateSnake(world: *runtime.World) void {
+    const app: *runtime.App = @ptrCast(@alignCast(world.ctx.?));
+    const state = app.resources.get(GameState).?;
+    if (state.* == .game_over) return;
+
+    const dt: f32 = @floatCast(app.time.delta);
+    var iter = app.world.view(&.{ GridPos, SnakeSegment, SnakeHead }, .{});
+    const head_entity = iter.next() orelse return;
+
+    const head = app.world.get(SnakeHead, head_entity.entity);
+    head.move_timer += dt;
+    if (head.move_timer < head.move_interval) return;
+    head.move_timer = 0;
+
+    head.dir_x = head.next_dir_x;
+    head.dir_y = head.next_dir_y;
+
+    var segments = std.ArrayList(runtime.ecs.Entity).initCapacity(app.frame_allocator.allocator(), 5) catch unreachable;
+    defer segments.deinit(app.frame_allocator.allocator());
+
+    const head_pos = app.world.getConst(GridPos, head_entity.entity);
+    // var seg_query = app.world.view(&.{ GridPos, SnakeSegment }, .{});
+
+    segments.append(app.frame_allocator.allocator(), head_entity.entity) catch unreachable;
+    var seg = app.world.getConst(SnakeSegment, head_entity.entity);
+    while (seg.next) |next| {
+        segments.append(app.frame_allocator.allocator(), next) catch unreachable;
+        seg = app.world.getConst(SnakeSegment, next);
+    }
+
+    var i = segments.items.len;
+    while (i > 1) {
+        i -= 1;
+        const behind = app.world.get(GridPos, segments.items[i]);
+        const ahead = app.world.getConst(GridPos, segments.items[i - 1]);
+        behind.x = ahead.x;
+        behind.y = ahead.y;
+    }
+
+    const head_pos_mut = app.world.get(GridPos, head_entity.entity);
+    head_pos_mut.x = head_pos.x + head.dir_x;
+    head_pos_mut.y = head_pos.y + head.dir_y;
+
+    // wall collision
+    if (head_pos_mut.x < 0 or head_pos_mut.x >= GRID_W or
+        head_pos_mut.y < 0 or head_pos_mut.y >= GRID_H)
+    {
+        app.resources.getMut(GameState).?.* = .game_over;
+        return;
+    }
+
+    // self collision
+    for (segments.items[1..]) |seg_entity| {
+        const seg_pos = app.world.getConst(GridPos, seg_entity);
+        if (seg_pos.x == head_pos_mut.x and seg_pos.y == head_pos_mut.y) {
+            app.resources.getMut(GameState).?.* = .game_over;
+            return;
+        }
+    }
+
+    // food collision
+    var food_query = app.world.view(&.{ GridPos, Food }, .{});
+    while (food_query.next()) |food_entity| {
+        const food_pos = app.world.get(GridPos, food_entity.entity);
+        if (food_pos.x == head_pos_mut.x and food_pos.y == head_pos_mut.y) {
+            var rand_x: i32 = 0;
+            var rand_y: i32 = 0;
+            var seed = std.time.timestamp();
+            while (true) {
+                rand_x = @mod(@as(i32, @intCast(seed)), GRID_W);
+                rand_y = @mod(@as(i32, @intCast(@divTrunc(seed, 7))), GRID_H);
+                if (!isOccupiedBySnake(app, rand_x, rand_y)) break;
+                seed += 1;
+            }
+            food_pos.x = rand_x;
+            food_pos.y = rand_y;
+
+            const tail_entity = segments.items[segments.items.len - 1];
+            const tail_pos = app.world.getConst(GridPos, tail_entity);
+            const tail_seg = app.world.get(SnakeSegment, tail_entity);
+            const new_tail = app.world.create();
+            app.world.add(new_tail, GridPos{ .x = tail_pos.x, .y = tail_pos.y });
+            app.world.add(new_tail, SnakeSegment{ .next = null });
+            app.world.add(new_tail, runtime.Transform{});
+            app.world.add(new_tail, runtime.Renderable{ .rect = .{ .width = CELL_SIZE - 2, .height = CELL_SIZE - 2 } });
+            app.world.add(new_tail, runtime.Color{ .r = 0, .g = 200, .b = 0, .a = 255 });
+            tail_seg.next = new_tail;
+
+            app.resources.getMut(Score).?.value += 1;
+        }
+    }
+}
