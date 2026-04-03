@@ -41,21 +41,15 @@ pub fn pollEvent(self: *Window) ?event.Event {
 }
 
 pub const Error = error{
-    OutOfMemory,
     RGFWInitFailed,
 };
 
-pub fn init(title: [:0]const u8, width: u32, height: u32) Error!*Window {
-    // We allocate the Window on the heap so the user pointer in RGFW stays valid
-    const allocator = std.heap.c_allocator;
-    const self = allocator.create(Window) catch return Error.OutOfMemory;
-
+/// Assumes window is already allocated and initialized
+pub fn init(self: *Window, title: [:0]const u8, width: u32, height: u32) Error!void {
     const handle = c.RGFW_createWindow(title.ptr, 0, 0, @intCast(width), @intCast(height), 0);
     if (handle == null) {
-        allocator.destroy(self);
         return Error.RGFWInitFailed;
     }
-
     self.* = .{
         .handle = handle.?,
         .width = width,
@@ -64,12 +58,10 @@ pub fn init(title: [:0]const u8, width: u32, height: u32) Error!*Window {
 
     c.RGFW_window_setUserPtr(handle, self);
     c.RGFW_window_center(handle);
-    return self;
 }
 
 pub fn deinit(self: *Window) void {
     c.RGFW_window_close(self.handle);
-    std.heap.c_allocator.destroy(self);
 }
 
 pub fn getSize(self: *Window) [2]i32 {

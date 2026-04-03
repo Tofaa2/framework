@@ -224,25 +224,6 @@ pub const Renderer = struct {
         _ = bgfx.frame(bgfx.FrameFlags_None);
     }
 
-    //
-    // pub fn draw(self: *Renderer, assets: *@import("../core/AssetPool.zig")) void {
-    //     var iter = self.views.iterator();
-    //     while (iter.next()) |entry| {
-    //         const view = entry.value_ptr;
-    //         const view_id: u8 = @intFromEnum(view.id);
-    //         bgfx.setViewClear(view_id, view.clear_flags, view.clear_color.toRGBA(), 1.0, 0.0);
-    //         bgfx.setViewRect(view_id, 0, 0, @intCast(self.viewport.width), @intCast(self.viewport.height));
-    //         bgfx.setViewTransform(view_id, &math.matToArr(view.view_mtx), &math.matToArr(view.proj_mtx));
-    //         bgfx.touch(view_id);
-    //     }
-    //     iter = self.views.iterator();
-    //     while (iter.next()) |entry| {
-    //         const view = entry.value_ptr;
-    //         self.drawView(view, assets);
-    //     }
-    //     _ = bgfx.frame(bgfx.FrameFlags_None);
-    // }
-
     fn drawView(self: *Renderer, view: *View, assets: *@import("../core/AssetPool.zig")) void {
         const view_id: u8 = @intFromEnum(view.id);
         const vp = zm.mul(view.view_mtx, view.proj_mtx);

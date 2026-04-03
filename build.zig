@@ -13,6 +13,7 @@ pub fn build(b: *std.Build) void {
     const stb = @import("stb/build.zig").build(b, target, optimize);
     const ecs = @import("ecs/build.zig").build(b, target, optimize);
     const rgfw = @import("rgfw/build.zig").build(b, target, optimize);
+    const renderer = @import("renderer/build.zig").build(b, target, optimize);
     const orin = @import("orin/build.zig").build(b, target, optimize, ecs);
 
     setupExamples(b, target, optimize, &.{
@@ -20,6 +21,7 @@ pub fn build(b: *std.Build) void {
         .{ .name = "orin", .module = orin },
         .{ .name = "ecs", .module = ecs },
         .{ .name = "rgfw", .module = rgfw.root_module },
+        .{ .name = "renderer", .module = renderer },
     }, &.{rgfw});
 }
 
