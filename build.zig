@@ -12,12 +12,15 @@ pub fn build(b: *std.Build) void {
 
     const stb = @import("stb/build.zig").build(b, target, optimize);
     const ecs = @import("ecs/build.zig").build(b, target, optimize);
+    const pool = @import("pool/build.zig").build(b, target, optimize);
     const rgfw = @import("rgfw/build.zig").build(b, target, optimize);
-    const renderer = @import("renderer/build.zig").build(b, target, optimize);
+    const renderer = @import("renderer/build.zig").build(b, target, optimize, pool);
+
     const orin = @import("orin/build.zig").build(b, target, optimize, ecs);
 
     setupExamples(b, target, optimize, &.{
         .{ .name = "stb", .module = stb.root_module },
+        .{ .name = "pool", .module = pool },
         .{ .name = "orin", .module = orin },
         .{ .name = "ecs", .module = ecs },
         .{ .name = "rgfw", .module = rgfw.root_module },

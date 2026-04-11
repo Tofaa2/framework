@@ -1,6 +1,7 @@
 const bgfx = @import("bgfx").bgfx;
 const ShaderProgram = @This();
 const isValid = @import("bgfx_util.zig").isValid;
+const pool = @import("pool");
 
 program_handle: bgfx.ProgramHandle,
 vertex_shader: bgfx.ShaderHandle,

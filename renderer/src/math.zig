@@ -2098,6 +2098,15 @@ pub fn identity() Mat {
     return static.identity;
 }
 
+pub fn identityArr() [16]f32 {
+    return [16]f32{
+        1.0, 0.0, 0.0, 0.0,
+        0.0, 1.0, 0.0, 0.0,
+        0.0, 0.0, 1.0, 0.0,
+        0.0, 0.0, 0.0, 1.0,
+    };
+}
+
 pub fn matFromArr(arr: [16]f32) Mat {
     return Mat{
         f32x4(arr[0], arr[1], arr[2], arr[3]),

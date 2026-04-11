@@ -5,7 +5,7 @@ pub const c = @cImport({
 });
 
 pub fn setFlipVerticallyOnLoad(value: bool) void {
-    c.stbi_set_flip_vertically_on_load(value);
+    c.stbi_set_flip_vertically_on_load(@intFromBool(value));
 }
 
 pub fn setFlipVerticallyOnWrite(value: bool) void {

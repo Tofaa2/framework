@@ -1,5 +1,3 @@
-/// Demonstration of the Orin Parallel Asset System.
-/// Loads a mock asset in the background and accesses it across multiple systems.
 const std = @import("std");
 const orin = @import("orin");
 

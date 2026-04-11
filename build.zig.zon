@@ -22,5 +22,9 @@
             .url = "git+https://github.com/zig-gamedev/zaudio/#e5b89fde58be72de359089e9b8f5c4d5126fb159",
             .hash = "zaudio-0.11.0-dev-_M-91uMxQQAWK02Oofoq8EFtqHwcSrJ-ISYEkcPJvViz",
         },
+        .zmesh = .{
+            .url = "git+https://github.com/zig-gamedev/zmesh#a9c23ba7440b8c03cbc2bec89a3285fe84cbb50f",
+            .hash = "zmesh-0.11.0-dev-oO3A5lKRCgCGK8Krro4Rj_F_MhO8LT487re5u_DNIzvl",
+        },
     },
 }

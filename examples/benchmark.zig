@@ -1,16 +1,10 @@
-/// Orin Backbone Performance Benchmarks.
-/// Tests dispatcher overhead, ECS iteration, parallel scaling, event throughput,
-/// asset loading throughput, and structural RwLock contention.
 const std = @import("std");
 const orin = @import("orin");
 
-// ---- Components & Events -------------------------------------------------
-
 const Position = struct { x: f32, y: f32, z: f32 };
 const Velocity = struct { x: f32, y: f32, z: f32 };
-const BenchEvent = struct { data: u128 }; 
+const BenchEvent = struct { data: u128 };
 
-// ---- Dummy Asset ---------------------------------------------------------
 const MyAsset = struct {
     allocator: std.mem.Allocator,
     data: []const u8,
@@ -27,8 +21,6 @@ const MyAsset = struct {
     }
 };
 
-// ---- Test 1: System Overhead (1000 systems) ------------------------------
-
 fn emptySystem(_: *orin.World) void {}
 
 fn runSystemOverhead(allocator: std.mem.Allocator) !void {
@@ -42,15 +34,13 @@ fn runSystemOverhead(allocator: std.mem.Allocator) !void {
 
     var timer = try std.time.Timer.start();
     const start = timer.read();
-    
+
     for (0..10) |_| app.tick();
-    
+
     const end = timer.read();
     const avg_ns = (end - start) / 10;
     std.debug.print("System Overhead (1k systems): {d:.3} ms/tick\n", .{@as(f64, @floatFromInt(avg_ns)) / 1_000_000.0});
 }
-
-// ---- Test 2: ECS Iteration (100k entities) ---------------------------------
 
 fn movementSystem(world: *orin.World) void {
     world.lockShared();
@@ -82,9 +72,9 @@ fn runECSIteration(allocator: std.mem.Allocator, entity_count: usize) !void {
 
     var timer = try std.time.Timer.start();
     const start = timer.read();
-    
+
     for (0..10) |_| app.tick();
-    
+
     const end = timer.read();
     const avg_ns = (end - start) / 10;
     std.debug.print("ECS Iteration ({d} entities, Parallel): {d:.3} ms/tick\n", .{ entity_count, @as(f64, @floatFromInt(avg_ns)) / 1_000_000.0 });
@@ -113,20 +103,20 @@ fn runEventThroughput(allocator: std.mem.Allocator) !void {
     defer app.deinit();
 
     app.addEvent(BenchEvent);
-    
+
     // Create 3 isolated parallel senders to test Mutex contention
     app.addSystem(heavySenderSystem).inPhase(.update).reads(Position).commit();
     app.addSystem(heavySenderSystem).inPhase(.update).reads(Velocity).commit();
     app.addSystem(heavySenderSystem).inPhase(.update).commit();
-    
+
     // Receiver in next phase
     app.addSystem(heavyReceiverSystem).inPhase(.post_update).commit();
 
     var timer = try std.time.Timer.start();
     const start = timer.read();
-    
+
     for (0..10) |_| app.tick();
-    
+
     const end = timer.read();
     const avg_ns = (end - start) / 10;
     std.debug.print("Event Storms (15k concurrent events/tick, 3 senders): {d:.3} ms/tick\n", .{@as(f64, @floatFromInt(avg_ns)) / 1_000_000.0});
@@ -138,7 +128,7 @@ fn runEventThroughput(allocator: std.mem.Allocator) !void {
 fn readerSystem(world: *orin.World) void {
     world.lockShared();
     defer world.unlockShared();
-    var it = world.query(&.{ Position });
+    var it = world.query(&.{Position});
     var accum: f32 = 0;
     while (it.next()) |row| {
         const p = world.getComponentConst(Position, row.entity).?;
@@ -155,7 +145,7 @@ const SpawnerState = struct {
 // ... While 1 writer takes RwLock Write locks actively mutating structural layout
 fn spawnerContentionSystem(world: *orin.World) void {
     var state = world.getMutResource(SpawnerState).?;
-    
+
     // Spawn 100 new entities
     for (0..100) |_| {
         const e = world.spawn();
@@ -191,22 +181,22 @@ fn runStructuralContention(allocator: std.mem.Allocator) !void {
     app.addSystem(readerSystem).inPhase(.update).reads(Velocity).commit();
     app.addSystem(readerSystem).inPhase(.update).reads(Position).commit();
     app.addSystem(readerSystem).inPhase(.update).reads(BenchEvent).commit();
-    
+
     // The structural mutating phase (has to run without readers because ecs_lock)
     // Wait; if it modifies structural layout, it takes `world.ecs_lock`
-    // However, if they are in the same phase, scheduler doesn't know about `spawn()` limits. 
+    // However, if they are in the same phase, scheduler doesn't know about `spawn()` limits.
     // Wait! `spawnerContentionSystem` modifies `SpawnerState`, so it gets its own scheduling constraint!
     // But `reads(SpawnerState)` vs `writes(SpawnerState)`... system builder does not track resources!
-    // Orin engine DOES NOT lock resources out of the box in the scheduler! 
+    // Orin engine DOES NOT lock resources out of the box in the scheduler!
     // They run in parallel phase .update if no Component access conflicts!
     // So Spawner AND Readers will run entirely concurrently, bashing the `RwLock` !
     app.addSystem(spawnerContentionSystem).inPhase(.update).commit();
 
     var timer = try std.time.Timer.start();
     const start = timer.read();
-    
+
     for (0..10) |_| app.tick();
-    
+
     const end = timer.read();
     const avg_ns = (end - start) / 10;
     std.debug.print("Structural Run Contention (4 Readers, 1 Writer, 10k entities): {d:.3} ms/tick\n", .{@as(f64, @floatFromInt(avg_ns)) / 1_000_000.0});
@@ -250,11 +240,11 @@ fn runAssetThroughput(allocator: std.mem.Allocator) !void {
                 finished += 1;
             }
         }
-        std.Thread.sleep(1 * std.time.ns_per_ms); 
+        std.Thread.sleep(1 * std.time.ns_per_ms);
     }
 
     const end = timer.read();
-    
+
     // Cleanup generated files
     std.fs.cwd().deleteTree("tmp_bench") catch {};
 
@@ -269,12 +259,12 @@ pub fn main() !void {
     const allocator = gpa.allocator();
 
     std.debug.print("--- Orin Backbone Testing & Benchmarks ---\n", .{});
-    
+
     try runSystemOverhead(allocator);
-    try runECSIteration(allocator, 100_000);   // Upped from 10k to 100k
+    try runECSIteration(allocator, 100_000); // Upped from 10k to 100k
     try runEventThroughput(allocator);
     try runStructuralContention(allocator);
     try runAssetThroughput(allocator);
-    
+
     std.debug.print("------------------------------------------\n", .{});
 }
