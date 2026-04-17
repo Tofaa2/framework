@@ -54,3 +54,29 @@ pub const Image = struct {
         c.stbi_image_free(self.data);
     }
 };
+
+pub const HdrImage = struct {
+    width: u32,
+    height: u32,
+    data: [*c]f32,
+
+    pub fn init(path: [:0]const u8) ImageError!HdrImage {
+        var width: c_int = undefined;
+        var height: c_int = undefined;
+        const data = c.stbi_loadf(@ptrCast(path.ptr), &width, &height, null, 0);
+        if (data == null) {
+            const reason = c.stbi_failure_reason();
+            std.log.err("[stb] HDR load failed: {s}", .{reason});
+            return ImageError.FailedToLoad;
+        }
+        return .{
+            .width = @intCast(width),
+            .height = @intCast(height),
+            .data = data,
+        };
+    }
+
+    pub fn deinit(self: *const HdrImage) void {
+        c.stbi_image_free(self.data);
+    }
+};

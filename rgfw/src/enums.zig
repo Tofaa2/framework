@@ -227,12 +227,18 @@ pub const MouseButton = enum(u8) {
     misc5,
     final,
 };
-pub const Keymod = enum(u8) {
-    caps_lock = 1 << 0,
-    num_lock = 1 << 1,
-    control = 1 << 2,
-    alt = 1 << 3,
-    shift = 1 << 4,
-    super = 1 << 5,
-    scroll_lock = 1 << 6,
+
+pub const Keymod = packed struct(u8) {
+    shift: bool = false,
+    control: bool = false,
+    alt: bool = false,
+    super: bool = false,
+    caps_lock: bool = false,
+    num_lock: bool = false,
+    scroll_lock: bool = false,
+    __unused: u1 = 0,
+
+    pub fn has(self: Keymod, mod: Keymod) bool {
+        return @as(u8, @bitCast(self)) & @as(u8, @bitCast(mod)) != 0;
+    }
 };

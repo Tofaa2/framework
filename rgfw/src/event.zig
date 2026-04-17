@@ -78,7 +78,7 @@ pub fn fromRGFW(c_ev: c.RGFW_event) Event {
             const ev = Event.KeyEvent{
                 .key = @enumFromInt(c_ev.key.value),
                 .repeat = c_ev.key.repeat != 0,
-                .mod = @enumFromInt(c_ev.key.mod),
+                .mod = @as(enums.Keymod, @bitCast(@as(u8, @intCast(c_ev.key.mod)))),
             };
             return if (c_ev.type == c.RGFW_keyPressed) .{ .key_pressed = ev } else .{ .key_released = ev };
         },

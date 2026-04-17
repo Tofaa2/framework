@@ -1,73 +1,49 @@
 const View = @This();
+const std = @import("std");
 const bgfx = @import("bgfx").bgfx;
-const DrawState = @import("DrawState.zig");
-const math = @import("math.zig");
+const math = @import("math");
+const ShaderProgram = @import("ShaderProgram.zig");
 
-id: bgfx.ViewId,
-rect: Rect,
-clear: ClearState,
-model: [16]f32,
-view: [16]f32,
-projection: [16]f32,
-default_state: DrawState,
+id: u16,
+projection_mtx: math.Mat4,
+view_mtx: math.Mat4,
+model_mtx: math.Mat4,
 
-pub const Rect = struct {
-    x: u16,
-    y: u16,
-    width: u16,
-    height: u16,
-};
-
-pub const ClearState = struct {
-    flags: u16 = bgfx.ClearFlags_Color | bgfx.ClearFlags_Depth,
-    color: u32 = 0x000000ff,
-    depth: f32 = 1.0,
-    stencil: u8 = 0,
-};
-
-pub fn init(id: bgfx.ViewId, rect: Rect, default_state: DrawState) View {
+pub fn init(id: u16) View {
     return .{
         .id = id,
-        .rect = rect,
-        .clear = .{},
-        .model = math.identityArr(),
-        .view = math.identityArr(),
-        .projection = math.identityArr(),
-        .default_state = default_state,
+        .model_mtx = math.Mat4.identity(),
+        .projection_mtx = math.Mat4.identity(),
+        .view_mtx = math.Mat4.identity(),
     };
 }
 
-// Call once per frame before submitting draws.
-pub fn apply(self: *const View) void {
-    bgfx.setViewRect(
-        self.id,
-        self.rect.x,
-        self.rect.y,
-        self.rect.width,
-        self.rect.height,
-    );
-    bgfx.setViewClear(
-        self.id,
-        self.clear.flags,
-        self.clear.color,
-        self.clear.depth,
-        self.clear.stencil,
-    );
-    bgfx.setViewTransform(self.id, &self.view, &self.projection);
+pub fn setProjectionMtx(self: *View, mtx: math.Mat4) void {
+    self.projection_mtx = mtx;
+    self.updateViewTransform();
+}
+
+pub fn setViewMtx(self: *View, mtx: math.Mat4) void {
+    self.view_mtx = mtx;
+    self.updateViewTransform();
+}
+
+pub fn setModelMtx(self: *View, mtx: math.Mat4) void {
+    self.model_mtx = mtx;
+}
+
+pub fn touch(self: *const View) void {
     bgfx.touch(self.id);
 }
 
-pub fn onResize(self: *View, width: u16, height: u16) void {
-    self.rect.width = width;
-    self.rect.height = height;
+pub fn submit(
+    self: *const View,
+    program: *const ShaderProgram,
+    depth: u32,
+) void {
+    bgfx.submit(self.id, program.program_handle, depth, bgfx.DiscardFlags_All);
 }
 
-pub fn setModel(self: *View, m: [16]f32) void {
-    self.model = m;
-}
-pub fn setViewMtx(self: *View, v: [16]f32) void {
-    self.view = v;
-}
-pub fn setProjection(self: *View, p: [16]f32) void {
-    self.projection = p;
+inline fn updateViewTransform(self: *View) void {
+    bgfx.setViewTransform(self.id, &self.view_mtx.m, &self.projection_mtx.m);
 }

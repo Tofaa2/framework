@@ -1,5 +1,6 @@
 const std = @import("std");
 const bgfx = @import("bgfx").bgfx;
+const math = @import("math");
 
 // Per-field override descriptor.
 // All fields are optional — only set what you want to override.
@@ -95,11 +96,15 @@ fn inferTypeMapping(comptime T: type) TypeMapping {
             },
         },
         .array => |arr| blk: {
-            if (arr.len < 1 or arr.len > 4)
-                @compileError("bgfx vertex layout: array length must be 1–4, got " ++
-                    std.fmt.comptimePrint("{}", .{arr.len}));
             const child = inferTypeMapping(arr.child);
             break :blk .{ .attrib_type = child.attrib_type, .num = arr.len };
+        },
+        .@"struct" => |s| blk: {
+            _ = s;
+            if (T == math.Vec2) break :blk .{ .attrib_type = .Float, .num = 2 };
+            if (T == math.Vec3) break :blk .{ .attrib_type = .Float, .num = 3 };
+            if (T == math.Vec4) break :blk .{ .attrib_type = .Float, .num = 4 };
+            @compileError("bgfx vertex layout: cannot infer AttribType from struct " ++ @typeName(T));
         },
         else => @compileError("bgfx vertex layout: cannot infer AttribType from type " ++
             @typeName(T)),
